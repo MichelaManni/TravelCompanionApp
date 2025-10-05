@@ -7,13 +7,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 // Set of Material typography styles to start with
-val Typography = Typography(
-    bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
+val Typography = Typography( // Definizione dell'oggetto Typography
+    bodyLarge = TextStyle( // Stile per il testo di corpo grande
+        fontFamily = FontFamily.Default, // Famiglia di font di default
+        fontWeight = FontWeight.Normal, // Peso del font normale
+        fontSize = 16.sp, // Dimensione del font 16sp
+        lineHeight = 24.sp, // Altezza della riga 24sp
+        letterSpacing = 0.5.sp // Spaziatura tra le lettere 0.5sp
     )
     /* Other default text styles to override
     titleLarge = TextStyle(

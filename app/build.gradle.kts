@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.travelcompanion"
+    namespace = "com.example.travelcompanionapp"
     compileSdk = 36 // Versione di SDK per la compilazione
 
     defaultConfig {
-        applicationId = "com.example.travelcompanion"
+        applicationId = "com.example.travelcompanionapp"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.foundation.android)
 
     // === JETPACK COMPOSE === //
     val composeBom = "2024.09.00" // Versione di Compose (BOM)
@@ -63,11 +64,19 @@ dependencies {
 
     // ViewModel per Compose: fornisce viewModelScope e la funzione viewModel()
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
+// === DIPENDENZA AGGIUNTA: LOTTIE (per le animazioni) ===
+    val lottieVersion = "6.4.1" // Ultima versione raccomandata
+    implementation("com.airbnb.android:lottie-compose:$lottieVersion")
 
     // === DIPENDENZA AGGIUNTA: COMPOSE NAVIGATION ===
     // Risolve l'errore di navigazione (NavHost, rememberNavController, composable)
     val navVersion = "2.7.7"
     implementation("androidx.navigation:navigation-compose:$navVersion")
+
+    // === DIPENDENZA AGGIUNTA: OSMDROID (OpenStreetMap) ===
+    // Versione stabile, l'ultima disponibile per il supporto Android
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+
 
     // === ROOM DATABASE === //
     val roomVersion = "2.6.1"

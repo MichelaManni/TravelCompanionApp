@@ -13,11 +13,27 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Date // Necessario per Date
-import java.time.Instant // Tipo moderno, ma useremo java.util.Date per coerenza con Trip.kt
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+// Formato standard per visualizzare la data nell'UI: Es. 31/12/2025
+private const val DATE_FORMAT = "dd/MM/yyyy"
 
 /**
- * 1. STATO UI PER LA LISTA DEI VIAGGI (GIA' ESISTENTE)
+ * Funzione di utilità per convertire una Stringa (es. "31/12/2025") in un oggetto Date.
+ */
+fun convertDateStringToDate(dateString: String): Date? {
+    return try {
+        SimpleDateFormat(DATE_FORMAT, Locale.ITALIAN).parse(dateString)
+    } catch (e: Exception) {
+        null // Ritorna null se la conversione fallisce
+    }
+}
+
+
+/**
+ * 1. STATO UI PER LA LISTA DEI VIAGGI
  */
 data class TripUiState(
     val tripList: List<Trip> = emptyList(),
@@ -25,106 +41,142 @@ data class TripUiState(
 )
 
 /**
- * 2. STATO UI PER L'INSERIMENTO DI UN SINGOLO VIAGGIO (NUOVO)
- * Contiene i dati che l'utente sta inserendo nel form.
- * Usiamo String per i campi di input, anche per le date, perché sono i tipi usati da TextField.
+ * 2. STATO UI PER L'INSERIMENTO DI UN SINGOLO VIAGGIO
  */
 data class TripDetailsUiState(
     val destination: String = "",
-    val startDate: String = "", // Rappresentazione testuale della data
-    val endDate: String = "",   // Rappresentazione testuale della data
-    val tripType: String = "Multi-day trip", // Valore predefinito
-    val totalDistanceKm: String = "0.0",
-    val isEntryValid: Boolean = false
+    // ⭐ AGGIORNATO: Campi per le coordinate (possono essere null se non selezionate da mappa)
+    val destinationLat: Double? = null,
+    val destinationLng: Double? = null,
+    // Contengono stringhe formattate (es. "01/11/2025")
+    val startDate: String = "",
+    val endDate: String = "",
+    val tripType: String = "Multi-day trip",
+    // Campo stringa per la distanza (input utente)
+    val totalDistanceStr: String = "",
+    // Campo double per la distanza (salvataggio nel DB)
+    val totalDistanceKm: Double = 0.0,
+    val isEntryValid: Boolean = false // Indica se il form è pronto per il salvataggio
 )
 
+
 /**
- * ViewModel: Contiene la logica di business e mantiene lo stato dell'UI.
+ * ViewModel principale dell'applicazione.
  */
 class TripViewModel(private val tripRepository: TripRepository) : ViewModel() {
 
-    // (CODICE ESISTENTE) StateFlow per la schermata della lista.
-    val uiState: StateFlow<TripUiState> = tripRepository.allTrips
-        .map { trips ->
-            TripUiState(tripList = trips, isLoading = false)
-        }
+    // ⭐ CORREZIONE 1: Risolve l'errore 'getAllTripsStream' e la catena Flow/stateIn
+    val uiState: StateFlow<TripUiState> = tripRepository.getAllTripsStream()
+        .map { TripUiState(it, false) } // Mappa List<Trip> in TripUiState
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = TripUiState(isLoading = true)
         )
 
-    // (NUOVO) StateFlow per la schermata di inserimento.
-    // Usiamo MutableStateFlow per permettere la scrittura.
+    // Stato per il form di inserimento (EntryScreen)
     private val _tripDetailsUiState = MutableStateFlow(TripDetailsUiState())
     val tripDetailsUiState: StateFlow<TripDetailsUiState> = _tripDetailsUiState.asStateFlow()
 
-    /**
-     * Aggiorna il valore della destinazione nel form.
-     */
+    // --- METODI PER AGGIORNARE LO STATO DEL FORM ---
+
     fun updateDestination(destination: String) {
-        _tripDetailsUiState.update { currentState ->
-            currentState.copy(destination = destination)
-        }
-        // TODO: Aggiungere qui la validazione del form se necessario
+        _tripDetailsUiState.update { it.copy(destination = destination) }
+        validateEntry()
     }
 
-    /**
-     * Aggiorna il valore del tipo di viaggio.
-     */
+    // ⭐ NUOVO METODO: Aggiorna la destinazione e le coordinate selezionate dalla mappa.
+    fun updateDestinationCoordinates(name: String, lat: Double, lng: Double) {
+        _tripDetailsUiState.update { currentState ->
+            currentState.copy(
+                destination = name,
+                destinationLat = lat,
+                destinationLng = lng
+            )
+        }
+        validateEntry()
+    }
+
+    fun updateStartDate(date: String) {
+        _tripDetailsUiState.update { it.copy(startDate = date) }
+        validateEntry()
+    }
+
+    fun updateEndDate(date: String) {
+        _tripDetailsUiState.update { it.copy(endDate = date) }
+        validateEntry()
+    }
+
     fun updateTripType(type: String) {
-        _tripDetailsUiState.update { currentState ->
-            currentState.copy(tripType = type)
-        }
+        _tripDetailsUiState.update { it.copy(tripType = type) }
+        validateEntry()
     }
 
-    // TODO: Implementare updateStartDate(date: Date) e updateEndDate(date: Date)
-    // per gestire l'aggiornamento delle date dal DatePicker.
+    // Gestione della distanza come Stringa
+    fun updateTotalDistanceStr(distanceStr: String) {
+        val distance = distanceStr.toDoubleOrNull() ?: 0.0
+        _tripDetailsUiState.update {
+            it.copy(
+                totalDistanceStr = distanceStr,
+                totalDistanceKm = distance
+            )
+        }
+        validateEntry()
+    }
+
+
+    private fun validateEntry() {
+        val currentState = _tripDetailsUiState.value
+        val isValid = currentState.destination.isNotBlank() &&
+                currentState.startDate.isNotBlank() &&
+                currentState.endDate.isNotBlank()
+        // Nota: le coordinate possono essere null, quindi non le usiamo per la validazione base
+
+        _tripDetailsUiState.update { it.copy(isEntryValid = isValid) }
+    }
+
 
     /**
-     * 1. Costruisce l'oggetto Trip dall'attuale TripDetailsUiState.
-     * 2. Chiama il Repository per salvare i dati.
+     * Funzione per salvare il viaggio nel database.
      */
-    fun saveNewTrip() {
-        // Estraiamo i dati dallo stato corrente.
+    fun saveTrip() {
         val currentState = _tripDetailsUiState.value
 
-        // --- ESEMPIO DI CONVERSIONE E GESTIONE DATI ---
-        // Attenzione: Qui c'è un placeholder! Le stringhe di data devono essere
-        // convertite in oggetti Date. Per ora, useremo Date() per semplificare.
+        // Conversione delle stringhe di data in oggetti Date per la Entity
+        // Gestiamo il caso in cui la conversione fallisca o la data sia vuota (anche se la validazione dovrebbe prevenirlo)
+        val finalStartDate = convertDateStringToDate(currentState.startDate) ?: Date()
+        val finalEndDate = convertDateStringToDate(currentState.endDate) ?: Date()
 
+
+        // Costruzione della nuova Entity Trip
         val newTrip = Trip(
             destination = currentState.destination,
-            // Sostituire con una corretta conversione da String a Date
-            startDate = Date(),
-            endDate = Date(),
+            // ⭐ CORREZIONE 2: Usa i campi delle coordinate aggiunti a TripDetailsUiState
+            destinationLat = currentState.destinationLat,
+            destinationLng = currentState.destinationLng,
+            // ⭐ FINE CORREZIONE 2
+            startDate = finalStartDate,
+            endDate = finalEndDate,
             tripType = currentState.tripType,
-            totalDistanceKm = currentState.totalDistanceKm.toDoubleOrNull() ?: 0.0
+            totalDistanceKm = currentState.totalDistanceKm
         )
 
-        // Eseguiamo l'inserimento nel DB in background (coroutine).
         viewModelScope.launch {
             tripRepository.insertTrip(newTrip)
-            // Dopo il salvataggio, possiamo resettare lo stato del form.
+            // Resetta lo stato del form dopo il salvataggio
             _tripDetailsUiState.value = TripDetailsUiState()
         }
     }
 
-    // (CODICE ESISTENTE) Funzione per inserire un nuovo viaggio nel database (usata da saveNewTrip).
-    fun saveNewTrip(trip: Trip) {
-        viewModelScope.launch {
-            tripRepository.insertTrip(trip)
-        }
-    }
 
     /**
      * Factory per creare il ViewModel.
-     * Rimane invariata ma ora gestisce anche la nuova logica.
      */
     companion object {
         fun Factory(repository: TripRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                require(modelClass.isAssignableFrom(TripViewModel::class.java))
                 return TripViewModel(repository) as T
             }
         }

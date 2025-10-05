@@ -20,74 +20,113 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.travelcompanionapp.data.AppDatabase
-import com.example.travelcompanionapp.repository.TripRepository
 import com.example.travelcompanionapp.ui.TripEntryScreen
+import com.example.travelcompanionapp.ui.SchermataIniziale
+// ⭐ NUOVI IMPORT
+import com.example.travelcompanionapp.ui.MainMenuScreen
+import com.example.travelcompanionapp.ui.MapSelectionScreen // Importa la nuova schermata
+// ⭐ FINE NUOVI IMPORT
 import com.example.travelcompanionapp.ui.theme.TravelCompanionAppTheme
 import com.example.travelcompanionapp.viewmodel.TripViewModel
-// Importazioni per la navigazione
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.platform.LocalContext
+// ⭐ IMPORT NECESSARIO per il cast dell'Application
+import com.example.travelcompanionapp.TravelCompanionApplication
+
 
 /**
- * Definizioni costanti delle rotte di navigazione.
+ * Definizioni costanti delle rotte di navigazione (per evitare errori di battitura).
  */
 object Destinations {
-    const val LIST_ROUTE = "tripList"
-    const val ENTRY_ROUTE = "tripEntry"
+    const val SPLASH_ROUTE = "splash_route"
+    const val MAIN_MENU_ROUTE = "main_menu_route"
+    const val LIST_ROUTE = "list_route"
+    const val ENTRY_ROUTE = "entry_route"
+    const val TRACKING_ROUTE = "tracking_route"
+    const val BACKGROUND_SETTINGS_ROUTE = "background_settings_route"
+    // ⭐ NUOVA ROTTA
+    const val MAP_SELECTION_ROUTE = "map_selection_route"
+    // ⭐ FINE NUOVA ROTTA
 }
 
-// === DICHIARAZIONE DEL REPOSITORY (NON DEL DATABASE) ===
-// Il Repository è l'unica dipendenza di cui abbiamo bisogno a livello di Activity/App
-// per costruire il ViewModel. Ora usa il Singleton del database.
-private val repository by lazy {
-    // L'uso di by lazy garantisce che venga creato solo la prima volta che viene richiesto.
-    // L'istanza del database viene recuperata usando il contesto dell'applicazione.
-    val database = AppDatabase.getDatabase(TravelCompanionApplication.context)
-    TripRepository(database.tripDao())
-}
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // **RIMOSSA** tutta la logica di inizializzazione del DB da qui.
-        // Viene gestita dal Singleton e da TravelCompanionApplication.
-
         setContent {
             TravelCompanionAppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    TravelCompanionApp()
+                    // ⭐ CORREZIONE: Uso della proprietà 'repository' anziché 'container'
+                    val appRepository = (application as TravelCompanionApplication).repository
+
+                    val viewModel: TripViewModel = viewModel(
+                        // ⭐ Passiamo direttamente il repository al factory
+                        factory = TripViewModel.Factory(appRepository)
+                    )
+                    TravelCompanionNavHost(viewModel = viewModel)
                 }
             }
         }
     }
 }
 
-/**
- * Composabile principale che gestisce la logica di navigazione e inietta il ViewModel.
- */
+
 @Composable
-fun TravelCompanionApp(
-    modifier: Modifier = Modifier,
-    // Il ViewModel viene creato usando la Factory che dipende dal Repository Singleton.
-    viewModel: TripViewModel = viewModel(
-        factory = TripViewModel.Factory(repository)
-    )
+fun TravelCompanionNavHost(
+    viewModel: TripViewModel
 ) {
-    // ... (Il resto del codice NavHost e composables è INVARIATO)
     val navController = rememberNavController()
 
-    NavHost(
-        navController = navController,
-        startDestination = Destinations.LIST_ROUTE,
-        modifier = modifier
-    ) {
+    NavHost(navController = navController, startDestination = Destinations.SPLASH_ROUTE) {
+
+        // 1. Splash Screen
+        composable(Destinations.SPLASH_ROUTE) {
+            SchermataIniziale(
+                onStartClick = {
+                    navController.navigate(Destinations.MAIN_MENU_ROUTE) {
+                        popUpTo(Destinations.SPLASH_ROUTE) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // 2. Menu Principale
+        composable(Destinations.MAIN_MENU_ROUTE) {
+            MainMenuScreen(
+                onAddTripClick = { navController.navigate(Destinations.ENTRY_ROUTE) },
+                onViewListClick = { navController.navigate(Destinations.LIST_ROUTE) },
+                onStartTrackingClick = { navController.navigate(Destinations.TRACKING_ROUTE) },
+                onBackgroundSettingsClick = { navController.navigate(Destinations.BACKGROUND_SETTINGS_ROUTE) }
+            )
+        }
+
+        // 3. Inserimento Viaggio (Form)
+        composable(Destinations.ENTRY_ROUTE) {
+            TripEntryScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+                // ⭐ Implementa il callback per la navigazione alla mappa
+                onNavigateToMapSelection = {
+                    navController.navigate(Destinations.MAP_SELECTION_ROUTE)
+                }
+            )
+        }
+
+        // ⭐ 4. Selezione Mappa (OSMDROID)
+        composable(Destinations.MAP_SELECTION_ROUTE) {
+            MapSelectionScreen(
+                // Il callback chiama il metodo nel ViewModel per salvare i dati
+                onDestinationSelected = viewModel::updateDestinationCoordinates,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // 5. Lista Viaggi (Placeholder)
         composable(Destinations.LIST_ROUTE) {
             PlaceholderListScreen(
                 viewModel = viewModel,
@@ -97,17 +136,38 @@ fun TravelCompanionApp(
             )
         }
 
-        composable(Destinations.ENTRY_ROUTE) {
-            TripEntryScreen(
-                viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
+        // 6. Tracciamento (Placeholder)
+        composable(Destinations.TRACKING_ROUTE) {
+            PlaceholderScreen(title = "Tracciamento GPS")
+        }
+
+        // 7. Impostazioni Background (Placeholder)
+        composable(Destinations.BACKGROUND_SETTINGS_ROUTE) {
+            PlaceholderScreen(title = "Impostazioni Background")
         }
     }
 }
 
+
 /**
- * Componente temporaneo (PlaceholderListScreen) INVARIATO.
+ * Componente generico per le rotte ancora da implementare.
+ */
+@Composable
+fun PlaceholderScreen(title: String) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(text = title, style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = "Da implementare secondo le specifiche del progetto.", style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+
+/**
+ * Componente temporaneo (PlaceholderListScreen) per mostrare lo stato del database.
  */
 @Composable
 fun PlaceholderListScreen(viewModel: TripViewModel, onAddTripClick: () -> Unit) {
