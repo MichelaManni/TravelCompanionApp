@@ -70,7 +70,14 @@ class TripViewModel(private val tripRepository: TripRepository) : ViewModel() {
     // --- METODI DI AGGIORNAMENTO ---
 
     fun updateDestination(destination: String) {
-        _tripDetailsUiState.update { it.copy(destination = destination) }
+        // Quando l'utente scrive manualmente, azzera le coordinate
+        _tripDetailsUiState.update {
+            it.copy(
+                destination = destination,
+                destinationLat = null,
+                destinationLng = null
+            )
+        }
         validateEntry()
     }
 

@@ -1,7 +1,8 @@
 package com.example.travelcompanionapp.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
@@ -11,14 +12,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.travelcompanionapp.viewmodel.TripViewModel
 import com.example.travelcompanionapp.viewmodel.TripDetailsUiState
 import java.text.SimpleDateFormat
 import java.util.*
+import com.example.travelcompanionapp.R
+import com.airbnb.lottie.compose.*
 
 // Tipi di viaggio obbligatori
 val TRIP_TYPES = listOf("Local trip", "Day trip", "Multi-day trip")
+
+
 
 /**
  * Schermata per l'inserimento di un nuovo viaggio.
@@ -32,15 +39,38 @@ fun TripEntryScreen(
 ) {
     val uiState by viewModel.tripDetailsUiState.collectAsState()
 
+    // Lottie Animation per il titolo
+    val headerComposition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(R.raw.nuovo_viaggio_menu)
+    )
+    val headerProgress by animateLottieCompositionAsState(
+        composition = headerComposition,
+        iterations = LottieConstants.IterateForever
+    )
+
     Scaffold(
         containerColor = Color.White,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        "Inserisci nuovo viaggio",
-                        color = Color.Black
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        // Lottie Animation accanto al titolo
+                        LottieAnimation(
+                            composition = headerComposition,
+                            progress = headerProgress,
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Nuovo Viaggio",
+                            color = TravelGreen,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -91,7 +121,6 @@ fun TripEntryForm(
     onOpenMapSelection: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Stati per i DatePicker
     val startDatePickerState = rememberDatePickerState()
     val endDatePickerState = rememberDatePickerState()
     var showStartDatePicker by remember { mutableStateOf(false) }
@@ -101,19 +130,17 @@ fun TripEntryForm(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Campo Destinazione (con selezione mappa)
+        // Campo Destinazione (scrittura manuale)
         OutlinedTextField(
             value = uiState.destination,
             onValueChange = onDestinationChange,
             label = { Text("Destinazione", color = Color.Black) },
-            placeholder = { Text("Seleziona dalla mappa o digita", color = Color.Gray) },
-            trailingIcon = {
-                IconButton(onClick = onOpenMapSelection) {
-                    Icon(
-                        Icons.Filled.LocationOn,
-                        contentDescription = "Seleziona Mappa",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+            placeholder = { Text("Es: Roma, Milano, Firenze...", color = Color.Gray) },
+            supportingText = {
+                if (uiState.destinationLat != null) {
+                    Text("📍 Posizione da mappa", color = TravelGreen)
+                } else {
+                    Text("Scrivi il nome o usa la mappa", color = Color.Gray)
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -121,12 +148,68 @@ fun TripEntryForm(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.Black,
                 unfocusedTextColor = Color.Black,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.Gray
+                focusedBorderColor = TravelGreen,
+                unfocusedBorderColor = Color.Gray,
+                cursorColor = TravelGreen
             )
         )
 
-        // Campo Data Inizio (con DatePicker)
+        // Pulsante per selezionare dalla mappa
+        Button(
+            onClick = onOpenMapSelection,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(),
+            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp, brush = androidx.compose.ui.graphics.SolidColor(TravelGreen))
+        ) {
+            Icon(
+                Icons.Filled.LocationOn,
+                contentDescription = null,
+                tint = TravelGreen,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "Seleziona dalla Mappa",
+                color = TravelGreen,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Mostra coordinate se selezionate dalla mappa
+        if (uiState.destinationLat != null && uiState.destinationLng != null) {
+            Surface(
+                color = TravelGreen.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            Icons.Filled.LocationOn,
+                            contentDescription = null,
+                            tint = TravelGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "GPS: ${String.format("%.4f", uiState.destinationLat)}, ${String.format("%.4f", uiState.destinationLng)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TravelGreen
+                        )
+                    }
+                }
+            }
+        }
+
+        // Campo Data Inizio
         OutlinedTextField(
             value = uiState.startDate,
             onValueChange = { },
@@ -138,24 +221,22 @@ fun TripEntryForm(
                     Icon(
                         Icons.Filled.DateRange,
                         contentDescription = "Seleziona Data Inizio",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = TravelGreen
                     )
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showStartDatePicker = true },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.Black,
                 unfocusedTextColor = Color.Black,
                 disabledTextColor = Color.Black,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                focusedBorderColor = TravelGreen,
                 unfocusedBorderColor = Color.Gray
             )
         )
 
-        // Campo Data Fine (con DatePicker)
+        // Campo Data Fine
         OutlinedTextField(
             value = uiState.endDate,
             onValueChange = { },
@@ -167,19 +248,17 @@ fun TripEntryForm(
                     Icon(
                         Icons.Filled.DateRange,
                         contentDescription = "Seleziona Data Fine",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = TravelGreen
                     )
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showEndDatePicker = true },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.Black,
                 unfocusedTextColor = Color.Black,
                 disabledTextColor = Color.Black,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                focusedBorderColor = TravelGreen,
                 unfocusedBorderColor = Color.Gray
             )
         )
@@ -190,28 +269,30 @@ fun TripEntryForm(
             onTypeSelected = onTripTypeChange
         )
 
-        // Mostra le coordinate se selezionate dalla mappa
-        if (uiState.destinationLat != null && uiState.destinationLng != null) {
-            Text(
-                text = "Coordinate: ${String.format("%.4f", uiState.destinationLat)}, ${String.format("%.4f", uiState.destinationLng)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
-            )
-        }
-
         Spacer(modifier = Modifier.weight(1f))
 
-        // Pulsante Salva
+        // Pulsante Salva (stesso stile del menu)
         Button(
             onClick = onSaveTrip,
             enabled = uiState.isEntryValid,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = TravelGreen,
+                disabledContainerColor = Color.Gray
+            )
         ) {
-            Text(text = "Salva Viaggio")
+            Text(
+                text = "Salva Viaggio",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 
-    // Dialog per Data Inizio
+    // Dialog Data Inizio
     if (showStartDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
@@ -226,7 +307,7 @@ fun TripEntryForm(
                         showStartDatePicker = false
                     }
                 ) {
-                    Text("OK")
+                    Text("OK", color = TravelGreen)
                 }
             },
             dismissButton = {
@@ -235,11 +316,18 @@ fun TripEntryForm(
                 }
             }
         ) {
-            DatePicker(state = startDatePickerState)
+            DatePicker(
+                state = startDatePickerState,
+                colors = DatePickerDefaults.colors(
+                    selectedDayContainerColor = TravelGreen,
+                    todayContentColor = TravelGreen,
+                    todayDateBorderColor = TravelGreen
+                )
+            )
         }
     }
 
-    // Dialog per Data Fine
+    // Dialog Data Fine
     if (showEndDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
@@ -254,7 +342,7 @@ fun TripEntryForm(
                         showEndDatePicker = false
                     }
                 ) {
-                    Text("OK")
+                    Text("OK", color = TravelGreen)
                 }
             },
             dismissButton = {
@@ -263,7 +351,14 @@ fun TripEntryForm(
                 }
             }
         ) {
-            DatePicker(state = endDatePickerState)
+            DatePicker(
+                state = endDatePickerState,
+                colors = DatePickerDefaults.colors(
+                    selectedDayContainerColor = TravelGreen,
+                    todayContentColor = TravelGreen,
+                    todayDateBorderColor = TravelGreen
+                )
+            )
         }
     }
 }
@@ -300,14 +395,15 @@ fun TripTypeDropdown(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.Black,
                 unfocusedTextColor = Color.Black,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                focusedBorderColor = TravelGreen,
                 unfocusedBorderColor = Color.Gray
             )
         )
 
         ExposedDropdownMenu(
             expanded = expanded.value,
-            onDismissRequest = { expanded.value = false }
+            onDismissRequest = { expanded.value = false },
+            modifier = Modifier.background(Color.White)
         ) {
             TRIP_TYPES.forEach { selectionOption ->
                 DropdownMenuItem(
@@ -316,7 +412,10 @@ fun TripTypeDropdown(
                         onTypeSelected(selectionOption)
                         expanded.value = false
                     },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                    colors = MenuDefaults.itemColors(
+                        textColor = Color.Black
+                    )
                 )
             }
         }

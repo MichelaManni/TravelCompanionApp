@@ -1,6 +1,7 @@
 package com.example.travelcompanionapp.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -10,13 +11,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+
+val TravelGreen = Color(0xFF008080)
 
 /**
  * Schermata per selezionare una destinazione dalla mappa.
@@ -28,12 +33,9 @@ fun MapSelectionScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-
-    // Coordinate selezionate (inizialmente Roma come esempio)
     var selectedLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var destinationName by remember { mutableStateOf("") }
 
-    // Configurazione OSMDroid
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
     }
@@ -45,7 +47,9 @@ fun MapSelectionScreen(
                 title = {
                     Text(
                         "Seleziona Destinazione",
-                        color = Color.Black
+                        color = TravelGreen,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
                     )
                 },
                 navigationIcon = {
@@ -58,13 +62,12 @@ fun MapSelectionScreen(
                     }
                 },
                 actions = {
-                    // Pulsante di conferma (visibile solo se una posizione è selezionata)
                     if (selectedLocation != null) {
                         IconButton(
                             onClick = {
                                 selectedLocation?.let { location ->
                                     val name = if (destinationName.isBlank()) {
-                                        "Posizione: ${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
+                                        "Lat ${String.format("%.4f", location.latitude)}, Lng ${String.format("%.4f", location.longitude)}"
                                     } else {
                                         destinationName
                                     }
@@ -76,7 +79,8 @@ fun MapSelectionScreen(
                             Icon(
                                 imageVector = Icons.Filled.Check,
                                 contentDescription = "Conferma Selezione",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = TravelGreen,
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                     }
@@ -92,24 +96,52 @@ fun MapSelectionScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Campo per inserire il nome della destinazione
+            // Campo nome destinazione (se posizione selezionata)
             if (selectedLocation != null) {
-                OutlinedTextField(
-                    value = destinationName,
-                    onValueChange = { destinationName = it },
-                    label = { Text("Nome Destinazione (opzionale)", color = Color.Black) },
-                    placeholder = { Text("Es: Roma, Colosseo", color = Color.Gray) },
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.Black,
-                        unfocusedTextColor = Color.Black,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Gray
-                    )
-                )
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        OutlinedTextField(
+                            value = destinationName,
+                            onValueChange = { destinationName = it },
+                            label = { Text("Nome Destinazione", color = Color.Black) },
+                            placeholder = { Text("Es: Roma, Colosseo", color = Color.Gray) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedBorderColor = TravelGreen,
+                                unfocusedBorderColor = Color.Gray,
+                                cursorColor = TravelGreen
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "📍 ${String.format("%.4f", selectedLocation!!.latitude)}, ${String.format("%.4f", selectedLocation!!.longitude)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TravelGreen
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "Tocca ✓ in alto per confermare",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                    }
+                }
             }
 
             // Mappa OSMDroid
@@ -119,18 +151,17 @@ fun MapSelectionScreen(
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
 
-                        // Centra su Roma come default
-                        val startPoint = GeoPoint(41.9028, 12.4964)
-                        controller.setZoom(10.0)
+                        // Centra su Italia centrale
+                        val startPoint = GeoPoint(42.5, 12.5)
+                        controller.setZoom(6.0)
                         controller.setCenter(startPoint)
 
-                        // Marker per la posizione selezionata
                         val marker = Marker(this).apply {
-                            title = "Destinazione Selezionata"
+                            title = "Destinazione"
                             isDraggable = true
                         }
 
-                        // Listener per il click sulla mappa
+                        // Click sulla mappa
                         setOnTouchListener { _, event ->
                             if (event.action == android.view.MotionEvent.ACTION_UP) {
                                 val projection = this.projection
@@ -141,7 +172,6 @@ fun MapSelectionScreen(
 
                                 selectedLocation = geoPoint
 
-                                // Aggiorna il marker
                                 marker.position = geoPoint
                                 if (!overlays.contains(marker)) {
                                     overlays.add(marker)
@@ -151,7 +181,7 @@ fun MapSelectionScreen(
                             false
                         }
 
-                        // Listener per il drag del marker
+                        // Drag del marker
                         marker.setOnMarkerDragListener(object : Marker.OnMarkerDragListener {
                             override fun onMarkerDrag(marker: Marker?) {}
                             override fun onMarkerDragStart(marker: Marker?) {}
@@ -168,59 +198,32 @@ fun MapSelectionScreen(
                     .weight(1f)
             )
 
-            // Informazioni sulla posizione selezionata
-            if (selectedLocation != null) {
+            // Istruzioni iniziali
+            if (selectedLocation == null) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                        containerColor = TravelGreen.copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Posizione Selezionata",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.Black
+                            text = "👆",
+                            fontSize = 24.sp,
+                            modifier = Modifier.padding(end = 12.dp)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Lat: ${String.format("%.4f", selectedLocation!!.latitude)}",
+                            text = "Tocca la mappa per selezionare la destinazione del tuo viaggio",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.Black
-                        )
-                        Text(
-                            text = "Lng: ${String.format("%.4f", selectedLocation!!.longitude)}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Black
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Tocca l'icona ✓ in alto per confermare",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
                         )
                     }
-                }
-            } else {
-                // Istruzioni iniziali
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Text(
-                        text = "Tocca la mappa per selezionare una destinazione",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black,
-                        modifier = Modifier.padding(16.dp)
-                    )
                 }
             }
         }
