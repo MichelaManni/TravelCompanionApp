@@ -17,23 +17,21 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Formato standard per visualizzare la data nell'UI: Es. 31/12/2025
 private const val DATE_FORMAT = "dd/MM/yyyy"
 
 /**
- * Funzione di utilità per convertire una Stringa (es. "31/12/2025") in un oggetto Date.
+ * Converte una stringa data in un oggetto Date.
  */
 fun convertDateStringToDate(dateString: String): Date? {
     return try {
         SimpleDateFormat(DATE_FORMAT, Locale.ITALIAN).parse(dateString)
     } catch (e: Exception) {
-        null // Ritorna null se la conversione fallisce
+        null
     }
 }
 
-
 /**
- * 1. STATO UI PER LA LISTA DEI VIAGGI
+ * Stato UI per la lista dei viaggi.
  */
 data class TripUiState(
     val tripList: List<Trip> = emptyList(),
@@ -41,54 +39,47 @@ data class TripUiState(
 )
 
 /**
- * 2. STATO UI PER L'INSERIMENTO DI UN SINGOLO VIAGGIO
+ * Stato UI per l'inserimento di un viaggio.
  */
 data class TripDetailsUiState(
     val destination: String = "",
-    // ⭐ AGGIORNATO: Campi per le coordinate (possono essere null se non selezionate da mappa)
     val destinationLat: Double? = null,
     val destinationLng: Double? = null,
-    // Contengono stringhe formattate (es. "01/11/2025")
     val startDate: String = "",
     val endDate: String = "",
     val tripType: String = "Multi-day trip",
-    // Campo stringa per la distanza (input utente)
-    val totalDistanceStr: String = "",
-    // Campo double per la distanza (salvataggio nel DB)
-    val totalDistanceKm: Double = 0.0,
-    val isEntryValid: Boolean = false // Indica se il form è pronto per il salvataggio
+    val isEntryValid: Boolean = false
 )
 
-
 /**
- * ViewModel principale dell'applicazione.
+ * ViewModel principale per la gestione dei viaggi.
  */
 class TripViewModel(private val tripRepository: TripRepository) : ViewModel() {
 
-    // ⭐ CORREZIONE 1: Risolve l'errore 'getAllTripsStream' e la catena Flow/stateIn
     val uiState: StateFlow<TripUiState> = tripRepository.getAllTripsStream()
-        .map { TripUiState(it, false) } // Mappa List<Trip> in TripUiState
+        .map { TripUiState(it, false) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = TripUiState(isLoading = true)
         )
 
-    // Stato per il form di inserimento (EntryScreen)
     private val _tripDetailsUiState = MutableStateFlow(TripDetailsUiState())
     val tripDetailsUiState: StateFlow<TripDetailsUiState> = _tripDetailsUiState.asStateFlow()
 
-    // --- METODI PER AGGIORNARE LO STATO DEL FORM ---
+    // --- METODI DI AGGIORNAMENTO ---
 
     fun updateDestination(destination: String) {
         _tripDetailsUiState.update { it.copy(destination = destination) }
         validateEntry()
     }
 
-    // ⭐ NUOVO METODO: Aggiorna la destinazione e le coordinate selezionate dalla mappa.
+    /**
+     * Aggiorna destinazione e coordinate dalla mappa.
+     */
     fun updateDestinationCoordinates(name: String, lat: Double, lng: Double) {
-        _tripDetailsUiState.update { currentState ->
-            currentState.copy(
+        _tripDetailsUiState.update {
+            it.copy(
                 destination = name,
                 destinationLat = lat,
                 destinationLng = lng
@@ -112,73 +103,69 @@ class TripViewModel(private val tripRepository: TripRepository) : ViewModel() {
         validateEntry()
     }
 
-    // Gestione della distanza come Stringa
-    fun updateTotalDistanceStr(distanceStr: String) {
-        val distance = distanceStr.toDoubleOrNull() ?: 0.0
-        _tripDetailsUiState.update {
-            it.copy(
-                totalDistanceStr = distanceStr,
-                totalDistanceKm = distance
-            )
-        }
-        validateEntry()
-    }
-
-
+    /**
+     * Valida che tutti i campi obbligatori siano compilati.
+     */
     private fun validateEntry() {
         val currentState = _tripDetailsUiState.value
+
+        // Validazione base: destinazione e date devono essere presenti
         val isValid = currentState.destination.isNotBlank() &&
                 currentState.startDate.isNotBlank() &&
                 currentState.endDate.isNotBlank()
-        // Nota: le coordinate possono essere null, quindi non le usiamo per la validazione base
 
-        _tripDetailsUiState.update { it.copy(isEntryValid = isValid) }
+        // Validazione aggiuntiva: verifica che la data fine sia >= data inizio
+        val datesValid = if (isValid) {
+            val startDate = convertDateStringToDate(currentState.startDate)
+            val endDate = convertDateStringToDate(currentState.endDate)
+            startDate != null && endDate != null && !endDate.before(startDate)
+        } else {
+            false
+        }
+
+        _tripDetailsUiState.update { it.copy(isEntryValid = isValid && datesValid) }
     }
 
-
     /**
-     * Funzione per salvare il viaggio nel database.
+     * Salva il viaggio nel database.
      */
     fun saveTrip() {
         val currentState = _tripDetailsUiState.value
 
-        // Conversione delle stringhe di data in oggetti Date per la Entity
-        // Gestiamo il caso in cui la conversione fallisca o la data sia vuota (anche se la validazione dovrebbe prevenirlo)
-        val finalStartDate = convertDateStringToDate(currentState.startDate) ?: Date()
-        val finalEndDate = convertDateStringToDate(currentState.endDate) ?: Date()
+        if (!currentState.isEntryValid) return
 
+        val startDate = convertDateStringToDate(currentState.startDate) ?: Date()
+        val endDate = convertDateStringToDate(currentState.endDate) ?: Date()
 
-        // Costruzione della nuova Entity Trip
         val newTrip = Trip(
             destination = currentState.destination,
-            // ⭐ CORREZIONE 2: Usa i campi delle coordinate aggiunti a TripDetailsUiState
             destinationLat = currentState.destinationLat,
             destinationLng = currentState.destinationLng,
-            // ⭐ FINE CORREZIONE 2
-            startDate = finalStartDate,
-            endDate = finalEndDate,
+            startDate = startDate,
+            endDate = endDate,
             tripType = currentState.tripType,
-            totalDistanceKm = currentState.totalDistanceKm
+            totalDistanceKm = 0.0, // Verrà calcolata durante il tracking GPS
+            status = "Pianificato"
         )
 
         viewModelScope.launch {
             tripRepository.insertTrip(newTrip)
-            // Resetta lo stato del form dopo il salvataggio
+            // Reset del form
             _tripDetailsUiState.value = TripDetailsUiState()
         }
     }
-
 
     /**
      * Factory per creare il ViewModel.
      */
     companion object {
-        fun Factory(repository: TripRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                require(modelClass.isAssignableFrom(TripViewModel::class.java))
-                return TripViewModel(repository) as T
+        fun Factory(repository: TripRepository): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    require(modelClass.isAssignableFrom(TripViewModel::class.java))
+                    return TripViewModel(repository) as T
+                }
             }
-        }
     }
 }

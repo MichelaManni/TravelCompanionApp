@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
-// ⭐ NUOVO IMPORT
 import androidx.compose.material.icons.filled.LocationOn
-// ⭐ FINE NUOVO IMPORT
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,43 +15,45 @@ import androidx.compose.ui.unit.dp
 import com.example.travelcompanionapp.viewmodel.TripViewModel
 import com.example.travelcompanionapp.viewmodel.TripDetailsUiState
 import java.text.SimpleDateFormat
-import java.util.Locale
-import com.example.travelcompanionapp.R
-import com.airbnb.lottie.compose.*
+import java.util.*
 
-
-// =========================
-
-// Definiamo i tipi di viaggio obbligatori come costanti
+// Tipi di viaggio obbligatori
 val TRIP_TYPES = listOf("Local trip", "Day trip", "Multi-day trip")
 
 /**
- * Schermata per l'inserimento o la modifica di un viaggio.
+ * Schermata per l'inserimento di un nuovo viaggio.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripEntryScreen(
     viewModel: TripViewModel,
     onNavigateBack: () -> Unit,
-    // ⭐ NUOVO PARAMETRO PER LA NAVIGAZIONE ALLA MAPPA
     onNavigateToMapSelection: () -> Unit
 ) {
-    // Collezioniamo lo StateFlow del form dal ViewModel.
     val uiState by viewModel.tripDetailsUiState.collectAsState()
 
     Scaffold(
         containerColor = Color.White,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Pianifica un nuovo viaggio") },
+                title = {
+                    Text(
+                        "Inserisci nuovo viaggio",
+                        color = Color.Black
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Torna Indietro"
+                            contentDescription = "Torna Indietro",
+                            tint = Color.Black
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.White
+                )
             )
         }
     ) { paddingValues ->
@@ -63,9 +63,10 @@ fun TripEntryScreen(
             onStartDateChange = viewModel::updateStartDate,
             onEndDateChange = viewModel::updateEndDate,
             onTripTypeChange = viewModel::updateTripType,
-            onTotalDistanceChange = viewModel::updateTotalDistanceStr,
-            onSaveTrip = viewModel::saveTrip,
-            // ⭐ PASSA IL NUOVO CALLBACK AL FORM
+            onSaveTrip = {
+                viewModel.saveTrip()
+                onNavigateBack()
+            },
             onOpenMapSelection = onNavigateToMapSelection,
             modifier = Modifier
                 .padding(paddingValues)
@@ -75,9 +76,8 @@ fun TripEntryScreen(
     }
 }
 
-
 /**
- * Form Composable per l'inserimento dei dati di un viaggio.
+ * Form per l'inserimento dei dati del viaggio.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,69 +87,190 @@ fun TripEntryForm(
     onStartDateChange: (String) -> Unit,
     onEndDateChange: (String) -> Unit,
     onTripTypeChange: (String) -> Unit,
-    onTotalDistanceChange: (String) -> Unit,
     onSaveTrip: () -> Unit,
-    // ⭐ NUOVO PARAMETRO
     onOpenMapSelection: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Stati per i DatePicker
+    val startDatePickerState = rememberDatePickerState()
+    val endDatePickerState = rememberDatePickerState()
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp) // Spazio tra i componenti
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Campo di input: Destinazione (ORA CLICCABILE)
+        // Campo Destinazione (con selezione mappa)
         OutlinedTextField(
-            value = uiState.destination, // Valore attuale dal modello di stato
-            onValueChange = onDestinationChange, // Permette l'inserimento manuale
-            label = { Text("Destinazione") }, // Etichetta del campo
-            placeholder = { Text("Seleziona dalla mappa o digita") },
-            // ⭐ Icona e click per aprire la mappa
+            value = uiState.destination,
+            onValueChange = onDestinationChange,
+            label = { Text("Destinazione", color = Color.Black) },
+            placeholder = { Text("Seleziona dalla mappa o digita", color = Color.Gray) },
             trailingIcon = {
                 IconButton(onClick = onOpenMapSelection) {
-                    Icon(Icons.Filled.LocationOn, contentDescription = "Seleziona Mappa")
+                    Icon(
+                        Icons.Filled.LocationOn,
+                        contentDescription = "Seleziona Mappa",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color.Gray
+            )
+        )
+
+        // Campo Data Inizio (con DatePicker)
+        OutlinedTextField(
+            value = uiState.startDate,
+            onValueChange = { },
+            label = { Text("Data Inizio", color = Color.Black) },
+            placeholder = { Text("Seleziona data", color = Color.Gray) },
+            readOnly = true,
+            trailingIcon = {
+                IconButton(onClick = { showStartDatePicker = true }) {
+                    Icon(
+                        Icons.Filled.DateRange,
+                        contentDescription = "Seleziona Data Inizio",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
-                // ⭐ Rende cliccabile tutto il campo per l'apertura della mappa
-                .clickable { onOpenMapSelection() },
-            singleLine = true // Una sola riga
+                .clickable { showStartDatePicker = true },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                disabledTextColor = Color.Black,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color.Gray
+            )
         )
 
-        // TODO: Aggiungere qui i campi per la selezione delle date (con DatePickerDialog)
+        // Campo Data Fine (con DatePicker)
+        OutlinedTextField(
+            value = uiState.endDate,
+            onValueChange = { },
+            label = { Text("Data Fine", color = Color.Black) },
+            placeholder = { Text("Seleziona data", color = Color.Gray) },
+            readOnly = true,
+            trailingIcon = {
+                IconButton(onClick = { showEndDatePicker = true }) {
+                    Icon(
+                        Icons.Filled.DateRange,
+                        contentDescription = "Seleziona Data Fine",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showEndDatePicker = true },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                disabledTextColor = Color.Black,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color.Gray
+            )
+        )
 
-        // Dropdown per il Tipo di Viaggio
+        // Dropdown Tipo di Viaggio
         TripTypeDropdown(
             selectedType = uiState.tripType,
             onTypeSelected = onTripTypeChange
         )
 
-        // Campo di input: Distanza (per i Multi-day trip)
-        OutlinedTextField(
-            // Il TextField deve visualizzare una Stringa. Usiamo il campo `totalDistanceStr`
-            value = uiState.totalDistanceStr,
+        // Mostra le coordinate se selezionate dalla mappa
+        if (uiState.destinationLat != null && uiState.destinationLng != null) {
+            Text(
+                text = "Coordinate: ${String.format("%.4f", uiState.destinationLat)}, ${String.format("%.4f", uiState.destinationLng)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+        }
 
-            // Chiama la funzione di aggiornamento nel ViewModel
-            onValueChange = onTotalDistanceChange,
+        Spacer(modifier = Modifier.weight(1f))
 
-            label = { Text("Distanza Totale (Km)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-
-        // Pulsante per salvare il viaggio
+        // Pulsante Salva
         Button(
-            onClick = onSaveTrip, // Azione al click
-            enabled = uiState.isEntryValid, // Abilitato solo a form valido
+            onClick = onSaveTrip,
+            enabled = uiState.isEntryValid,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(text = "Salva Viaggio") // Testo del pulsante
+            Text(text = "Salva Viaggio")
+        }
+    }
+
+    // Dialog per Data Inizio
+    if (showStartDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showStartDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        startDatePickerState.selectedDateMillis?.let { millis ->
+                            val date = Date(millis)
+                            val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
+                            onStartDateChange(formatter.format(date))
+                        }
+                        showStartDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartDatePicker = false }) {
+                    Text("Annulla")
+                }
+            }
+        ) {
+            DatePicker(state = startDatePickerState)
+        }
+    }
+
+    // Dialog per Data Fine
+    if (showEndDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        endDatePickerState.selectedDateMillis?.let { millis ->
+                            val date = Date(millis)
+                            val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
+                            onEndDateChange(formatter.format(date))
+                        }
+                        showEndDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndDatePicker = false }) {
+                    Text("Annulla")
+                }
+            }
+        ) {
+            DatePicker(state = endDatePickerState)
         }
     }
 }
 
-
-// Il codice di TripTypeDropdown rimane invariato.
+/**
+ * Dropdown per la selezione del tipo di viaggio.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripTypeDropdown(
@@ -164,30 +285,33 @@ fun TripTypeDropdown(
         onExpandedChange = { expanded.value = !expanded.value },
         modifier = modifier.fillMaxWidth()
     ) {
-        // TextField che mostra il valore selezionato
         OutlinedTextField(
-            modifier = Modifier.exposedDropdownSize(true).fillMaxWidth().menuAnchor(),
+            modifier = Modifier
+                .exposedDropdownSize(true)
+                .fillMaxWidth()
+                .menuAnchor(),
             readOnly = true,
             value = selectedType,
             onValueChange = {},
-            label = { Text("Tipo di Viaggio") },
+            label = { Text("Tipo di Viaggio", color = Color.Black) },
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value)
             },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black
+                unfocusedTextColor = Color.Black,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color.Gray
             )
         )
 
-        // Il menu a tendina vero e proprio
         ExposedDropdownMenu(
             expanded = expanded.value,
             onDismissRequest = { expanded.value = false }
         ) {
             TRIP_TYPES.forEach { selectionOption ->
                 DropdownMenuItem(
-                    text = { Text(selectionOption) },
+                    text = { Text(selectionOption, color = Color.Black) },
                     onClick = {
                         onTypeSelected(selectionOption)
                         expanded.value = false
