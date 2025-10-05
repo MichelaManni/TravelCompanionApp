@@ -3,41 +3,28 @@ package com.example.travelcompanionapp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.travelcompanionapp.ui.TripEntryScreen
-import com.example.travelcompanionapp.ui.SchermataIniziale
-// ⭐ NUOVI IMPORT
-import com.example.travelcompanionapp.ui.MainMenuScreen
-import com.example.travelcompanionapp.ui.MapSelectionScreen // Importa la nuova schermata
-// ⭐ FINE NUOVI IMPORT
-import com.example.travelcompanionapp.ui.theme.TravelCompanionAppTheme
-import com.example.travelcompanionapp.viewmodel.TripViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.ui.platform.LocalContext
-// ⭐ IMPORT NECESSARIO per il cast dell'Application
-import com.example.travelcompanionapp.TravelCompanionApplication
-
+// Import per le schermate
+import com.example.travelcompanionapp.ui.TripEntryScreen
+import com.example.travelcompanionapp.ui.SchermataIniziale
+import com.example.travelcompanionapp.ui.MainMenuScreen
+import com.example.travelcompanionapp.ui.MapSelectionScreen
+import com.example.travelcompanionapp.ui.TripListScreen // ⭐ NUOVA IMPORT
+import com.example.travelcompanionapp.ui.theme.TravelCompanionAppTheme
+import com.example.travelcompanionapp.viewmodel.TripViewModel
 
 /**
- * Definizioni costanti delle rotte di navigazione (per evitare errori di battitura).
+ * Definizioni costanti delle rotte di navigazione.
+ * Usiamo costanti per evitare errori di battitura.
  */
 object Destinations {
     const val SPLASH_ROUTE = "splash_route"
@@ -46,12 +33,13 @@ object Destinations {
     const val ENTRY_ROUTE = "entry_route"
     const val TRACKING_ROUTE = "tracking_route"
     const val BACKGROUND_SETTINGS_ROUTE = "background_settings_route"
-    // ⭐ NUOVA ROTTA
     const val MAP_SELECTION_ROUTE = "map_selection_route"
-    // ⭐ FINE NUOVA ROTTA
 }
 
-
+/**
+ * Activity principale dell'app.
+ * Gestisce la creazione del ViewModel e la navigazione tra schermate.
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,13 +49,15 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // ⭐ CORREZIONE: Uso della proprietà 'repository' anziché 'container'
+                    // Otteniamo il repository dall'Application
                     val appRepository = (application as TravelCompanionApplication).repository
 
+                    // Creiamo il ViewModel usando il Factory pattern
                     val viewModel: TripViewModel = viewModel(
-                        // ⭐ Passiamo direttamente il repository al factory
                         factory = TripViewModel.Factory(appRepository)
                     )
+
+                    // Avviamo il sistema di navigazione
                     TravelCompanionNavHost(viewModel = viewModel)
                 }
             }
@@ -75,104 +65,113 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
+/**
+ * Sistema di navigazione dell'app.
+ * Definisce tutte le schermate e come navigare tra loro.
+ */
 @Composable
 fun TravelCompanionNavHost(
     viewModel: TripViewModel
 ) {
+    // Controller per gestire la navigazione
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = Destinations.SPLASH_ROUTE) {
+    // NavHost definisce tutte le "destinazioni" (schermate) dell'app
+    NavHost(
+        navController = navController,
+        startDestination = Destinations.SPLASH_ROUTE // Schermata iniziale
+    ) {
 
-        // 1. Splash Screen
+        // === 1. SPLASH SCREEN (Schermata di benvenuto) ===
         composable(Destinations.SPLASH_ROUTE) {
             SchermataIniziale(
                 onStartClick = {
+                    // Quando clicca "Start", vai al menu principale
                     navController.navigate(Destinations.MAIN_MENU_ROUTE) {
+                        // Rimuove lo splash dallo stack (non può tornare indietro)
                         popUpTo(Destinations.SPLASH_ROUTE) { inclusive = true }
                     }
                 }
             )
         }
 
-        // 2. Menu Principale
+        // === 2. MENU PRINCIPALE ===
         composable(Destinations.MAIN_MENU_ROUTE) {
             MainMenuScreen(
-                onAddTripClick = { navController.navigate(Destinations.ENTRY_ROUTE) },
-                onViewListClick = { navController.navigate(Destinations.LIST_ROUTE) },
-                onStartTrackingClick = { navController.navigate(Destinations.TRACKING_ROUTE) },
-                onBackgroundSettingsClick = { navController.navigate(Destinations.BACKGROUND_SETTINGS_ROUTE) }
+                // Quando clicca "Nuovo Viaggio"
+                onAddTripClick = {
+                    navController.navigate(Destinations.ENTRY_ROUTE)
+                },
+                // Quando clicca "I Miei Viaggi"
+                onViewListClick = {
+                    navController.navigate(Destinations.LIST_ROUTE)
+                },
+                // Quando clicca "Inizia Viaggio"
+                onStartTrackingClick = {
+                    navController.navigate(Destinations.TRACKING_ROUTE)
+                },
+                // Quando clicca "Op. Avanzate"
+                onBackgroundSettingsClick = {
+                    navController.navigate(Destinations.BACKGROUND_SETTINGS_ROUTE)
+                }
             )
         }
 
-        // 3. Inserimento Viaggio (Form)
+        // === 3. INSERIMENTO NUOVO VIAGGIO ===
         composable(Destinations.ENTRY_ROUTE) {
             TripEntryScreen(
                 viewModel = viewModel,
+                // Torna indietro al menu
                 onNavigateBack = { navController.popBackStack() },
-                // ⭐ Implementa il callback per la navigazione alla mappa
+                // Apre la mappa per selezionare destinazione
                 onNavigateToMapSelection = {
                     navController.navigate(Destinations.MAP_SELECTION_ROUTE)
                 }
             )
         }
 
-        // ⭐ 4. Selezione Mappa (OSMDROID)
+        // === 4. SELEZIONE DESTINAZIONE SU MAPPA ===
         composable(Destinations.MAP_SELECTION_ROUTE) {
             MapSelectionScreen(
-                // Il callback chiama il metodo nel ViewModel per salvare i dati
+                // Quando seleziona una posizione, salva nel ViewModel
                 onDestinationSelected = viewModel::updateDestinationCoordinates,
+                // Torna alla schermata precedente (TripEntryScreen)
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        // 5. Lista Viaggi (Placeholder)
+        // === 5. LISTA VIAGGI (⭐ NUOVA SCHERMATA) ===
         composable(Destinations.LIST_ROUTE) {
-            PlaceholderListScreen(
+            TripListScreen(
                 viewModel = viewModel,
-                onAddTripClick = {
-                    navController.navigate(Destinations.ENTRY_ROUTE)
+                // Torna al menu principale
+                onNavigateBack = { navController.popBackStack() },
+                // Quando clicca su un viaggio (TODO: implementare dettaglio)
+                onTripClick = { trip ->
+                    // Per ora non fa nulla, in futuro aprirà una schermata dettaglio
+                    // TODO: navigare a schermata dettaglio viaggio
                 }
             )
         }
 
-        // 6. Tracciamento (Placeholder)
+        // === 6. TRACCIAMENTO GPS (Placeholder - da implementare) ===
         composable(Destinations.TRACKING_ROUTE) {
-            PlaceholderScreen(title = "Tracciamento GPS")
+            PlaceholderScreen(title = "Inizia Viaggio")
         }
 
-        // 7. Impostazioni Background (Placeholder)
+        // === 7. IMPOSTAZIONI BACKGROUND (Placeholder - da implementare) ===
         composable(Destinations.BACKGROUND_SETTINGS_ROUTE) {
-            PlaceholderScreen(title = "Impostazioni Background")
+            PlaceholderScreen(title = "Operazioni Avanzate")
         }
     }
 }
 
-
 /**
- * Componente generico per le rotte ancora da implementare.
+ * Schermata segnaposto per le funzionalità non ancora implementate.
+ * Mostra semplicemente un titolo e un messaggio.
  */
 @Composable
 fun PlaceholderScreen(title: String) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(text = title, style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "Da implementare secondo le specifiche del progetto.", style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-
-/**
- * Componente temporaneo (PlaceholderListScreen) per mostrare lo stato del database.
- */
-@Composable
-fun PlaceholderListScreen(viewModel: TripViewModel, onAddTripClick: () -> Unit) {
-    val uiState by viewModel.uiState.collectAsState()
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -180,12 +179,14 @@ fun PlaceholderListScreen(viewModel: TripViewModel, onAddTripClick: () -> Unit) 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Stato del DB: ${if (uiState.isLoading) "Caricamento in corso..." else "OK"}")
-        Text("Viaggi nel database: ${uiState.tripList.size}")
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(onClick = onAddTripClick) {
-            Text("Aggiungi Nuovo Viaggio (EntryScreen)")
-        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Questa funzionalità sarà implementata prossimamente",
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }

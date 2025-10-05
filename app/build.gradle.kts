@@ -77,6 +77,7 @@ dependencies {
     // Versione stabile, l'ultima disponibile per il supporto Android
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
+    implementation("androidx.compose.material:material-icons-extended:1.6.8")
 
     // === ROOM DATABASE === //
     val roomVersion = "2.6.1"
