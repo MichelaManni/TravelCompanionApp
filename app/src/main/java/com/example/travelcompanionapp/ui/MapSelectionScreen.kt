@@ -1,5 +1,6 @@
 package com.example.travelcompanionapp.ui
 
+import android.location.Geocoder
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,17 +15,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
 val TravelGreen = Color(0xFF008080)
 
 /**
- * Schermata per selezionare una destinazione dalla mappa.
+ * Schermata per selezionare una destinazione dalla mappa Google Maps.
+ * L'utente può:
+ * 1. Toccare un punto sulla mappa
+ * 2. Trascinare il marker
+ * 3. Il sistema converte automaticamente le coordinate in un indirizzo reale (Geocoding)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,11 +39,75 @@ fun MapSelectionScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    var selectedLocation by remember { mutableStateOf<GeoPoint?>(null) }
-    var destinationName by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        Configuration.getInstance().userAgentValue = context.packageName
+    // Stato per la posizione selezionata sulla mappa
+    var selectedLocation by remember { mutableStateOf<LatLng?>(null) }
+
+    // Nome del luogo convertito dalle coordinate (es: "Roma, Italia")
+    var locationName by remember { mutableStateOf<String?>(null) }
+
+    // Indica se stiamo caricando il nome del luogo
+    var isLoadingAddress by remember { mutableStateOf(false) }
+
+    // Camera position iniziale: centro Italia
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(42.5, 12.5), 6f)
+    }
+
+    /**
+     * Funzione che converte le coordinate geografiche in un indirizzo leggibile.
+     * Usa il servizio Geocoder di Android per ottenere il nome del luogo.
+     */
+    suspend fun getAddressFromLocation(latLng: LatLng): String {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Geocoder è il servizio Android per convertire coordinate in indirizzi
+                val geocoder = Geocoder(context, Locale.getDefault())
+
+                // Otteniamo fino a 1 risultato per le coordinate specificate
+                val addresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1)
+
+                if (!addresses.isNullOrEmpty()) {
+                    val address = addresses[0]
+
+                    // Costruiamo un nome leggibile dal risultato
+                    // Esempio: "Via Roma, Milano, Italia" oppure "Milano, Italia"
+                    buildString {
+                        // Prova a prendere il nome della località (es: "Colosseo", "Piazza Duomo")
+                        address.featureName?.let {
+                            if (it != address.locality && !it.matches(Regex("\\d+"))) {
+                                append(it)
+                                append(", ")
+                            }
+                        }
+
+                        // Aggiungi la città
+                        address.locality?.let {
+                            append(it)
+                            append(", ")
+                        }
+
+                        // Aggiungi la provincia/regione se la città non è presente
+                        if (address.locality == null) {
+                            address.subAdminArea?.let {
+                                append(it)
+                                append(", ")
+                            }
+                        }
+
+                        // Aggiungi sempre il paese
+                        address.countryName?.let { append(it) }
+                    }.trim().removeSuffix(",")
+                } else {
+                    // Se non troviamo un indirizzo, usiamo le coordinate
+                    "Lat ${String.format("%.4f", latLng.latitude)}, Lng ${String.format("%.4f", latLng.longitude)}"
+                }
+            } catch (e: Exception) {
+                // In caso di errore (es: nessuna connessione), usiamo le coordinate
+                "Lat ${String.format("%.4f", latLng.latitude)}, Lng ${String.format("%.4f", latLng.longitude)}"
+            }
+        }
     }
 
     Scaffold(
@@ -62,17 +132,18 @@ fun MapSelectionScreen(
                     }
                 },
                 actions = {
-                    if (selectedLocation != null) {
+                    // Mostra il pulsante di conferma solo se c'è una posizione selezionata
+                    if (selectedLocation != null && locationName != null) {
                         IconButton(
                             onClick = {
+                                // Quando l'utente conferma, passiamo i dati al chiamante
                                 selectedLocation?.let { location ->
-                                    val name = if (destinationName.isBlank()) {
-                                        "Lat ${String.format("%.4f", location.latitude)}, Lng ${String.format("%.4f", location.longitude)}"
-                                    } else {
-                                        destinationName
-                                    }
-                                    onDestinationSelected(name, location.latitude, location.longitude)
-                                    onNavigateBack()
+                                    onDestinationSelected(
+                                        locationName!!, // Nome del luogo
+                                        location.latitude, // Latitudine
+                                        location.longitude // Longitudine
+                                    )
+                                    onNavigateBack() // Torniamo alla schermata precedente
                                 }
                             }
                         ) {
@@ -96,7 +167,7 @@ fun MapSelectionScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Campo nome destinazione (se posizione selezionata)
+            // Card informativa con il nome del luogo selezionato
             if (selectedLocation != null) {
                 Card(
                     modifier = Modifier
@@ -108,97 +179,117 @@ fun MapSelectionScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        OutlinedTextField(
-                            value = destinationName,
-                            onValueChange = { destinationName = it },
-                            label = { Text("Nome Destinazione", color = Color.Black) },
-                            placeholder = { Text("Es: Roma, Colosseo", color = Color.Gray) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.Black,
-                                unfocusedTextColor = Color.Black,
-                                focusedBorderColor = TravelGreen,
-                                unfocusedBorderColor = Color.Gray,
-                                cursorColor = TravelGreen
-                            )
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        // Etichetta
+                        Text(
+                            text = "📍 Destinazione Selezionata",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TravelGreen,
+                            fontWeight = FontWeight.Bold
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Text(
-                            text = "📍 ${String.format("%.4f", selectedLocation!!.latitude)}, ${String.format("%.4f", selectedLocation!!.longitude)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TravelGreen
-                        )
+                        // Nome del luogo o indicatore di caricamento
+                        if (isLoadingAddress) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = TravelGreen
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Ricerca indirizzo...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.Gray
+                                )
+                            }
+                        } else if (locationName != null) {
+                            // Mostra il nome del luogo trovato
+                            Text(
+                                text = locationName!!,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                        Text(
-                            text = "Tocca ✓ in alto per confermare",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
-                        )
+                            // Istruzioni per confermare
+                            Text(
+                                text = "Tocca ✓ in alto per confermare",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
                     }
                 }
             }
 
-            // Mappa OSMDroid
-            AndroidView(
-                factory = { ctx ->
-                    MapView(ctx).apply {
-                        setTileSource(TileSourceFactory.MAPNIK)
-                        setMultiTouchControls(true)
-
-                        // Centra su Italia centrale
-                        val startPoint = GeoPoint(42.5, 12.5)
-                        controller.setZoom(6.0)
-                        controller.setCenter(startPoint)
-
-                        val marker = Marker(this).apply {
-                            title = "Destinazione"
-                            isDraggable = true
-                        }
-
-                        // Click sulla mappa
-                        setOnTouchListener { _, event ->
-                            if (event.action == android.view.MotionEvent.ACTION_UP) {
-                                val projection = this.projection
-                                val geoPoint = projection.fromPixels(
-                                    event.x.toInt(),
-                                    event.y.toInt()
-                                ) as GeoPoint
-
-                                selectedLocation = geoPoint
-
-                                marker.position = geoPoint
-                                if (!overlays.contains(marker)) {
-                                    overlays.add(marker)
-                                }
-                                invalidate()
-                            }
-                            false
-                        }
-
-                        // Drag del marker
-                        marker.setOnMarkerDragListener(object : Marker.OnMarkerDragListener {
-                            override fun onMarkerDrag(marker: Marker?) {}
-                            override fun onMarkerDragStart(marker: Marker?) {}
-                            override fun onMarkerDragEnd(marker: Marker?) {
-                                marker?.position?.let { position ->
-                                    selectedLocation = position
-                                }
-                            }
-                        })
-                    }
-                },
+            // Google Map - Occupa tutto lo spazio rimanente
+            GoogleMap(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-            )
+                    .weight(1f), // Prende tutto lo spazio verticale disponibile
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(
+                    isMyLocationEnabled = false
+                ),
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = true, // Pulsanti +/- per zoom
+                    myLocationButtonEnabled = false
+                ),
+                onMapClick = { latLng ->
+                    // Quando l'utente tocca sulla mappa
+                    selectedLocation = latLng
+                    isLoadingAddress = true
+                    locationName = null
 
-            // Istruzioni iniziali
+                    // Avvia la conversione coordinate → indirizzo in background
+                    scope.launch {
+                        val address = getAddressFromLocation(latLng)
+                        locationName = address
+                        isLoadingAddress = false
+                    }
+                }
+            ) {
+                // Marker sulla posizione selezionata (se presente)
+                selectedLocation?.let { location ->
+                    // Creiamo uno stato per il marker che può essere trascinato
+                    val markerState = rememberMarkerState(position = location)
+
+                    // Osserva i cambiamenti nella posizione del marker (quando viene trascinato)
+                    LaunchedEffect(markerState.position) {
+                        // Se la posizione del marker è diversa da quella selezionata
+                        if (markerState.position != location) {
+                            // Aggiorna la posizione selezionata
+                            selectedLocation = markerState.position
+                            isLoadingAddress = true
+                            locationName = null
+
+                            // Ottieni il nuovo indirizzo
+                            val address = getAddressFromLocation(markerState.position)
+                            locationName = address
+                            isLoadingAddress = false
+                        }
+                    }
+
+                    // Marker rosso trascinabile
+                    Marker(
+                        state = markerState,
+                        title = "Destinazione",
+                        draggable = true // Permette di trascinare il marker
+                    )
+                }
+            }
+
+            // Card con istruzioni iniziali (visibile solo se non c'è nulla selezionato)
             if (selectedLocation == null) {
                 Card(
                     modifier = Modifier
@@ -218,11 +309,20 @@ fun MapSelectionScreen(
                             fontSize = 24.sp,
                             modifier = Modifier.padding(end = 12.dp)
                         )
-                        Text(
-                            text = "Tocca la mappa per selezionare la destinazione del tuo viaggio",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Black
-                        )
+                        Column {
+                            Text(
+                                text = "Tocca la mappa per selezionare un luogo",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Puoi anche trascinare il marker per spostarlo",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
                     }
                 }
             }

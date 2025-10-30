@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.location.Location
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,31 +21,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.airbnb.lottie.compose.*
 import com.example.travelcompanionapp.R
 import com.example.travelcompanionapp.data.Trip
 import com.example.travelcompanionapp.viewmodel.TripViewModel
 import com.google.android.gms.location.*
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.*
 import kotlinx.coroutines.delay
-import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polyline
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.roundToInt
 
 /**
- * Schermata per il tracciamento GPS di un viaggio.
- * Permette di:
- * - Selezionare un viaggio dalla lista
- * - Avviare/fermare il tracciamento GPS
- * - Visualizzare il percorso sulla mappa
- * - Calcolare la distanza percorsa
+ * Schermata per il tracciamento GPS di un viaggio con Google Maps.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,10 +50,15 @@ fun TripTrackingScreen(
     var selectedTrip by remember { mutableStateOf<Trip?>(null) }
     var isTracking by remember { mutableStateOf(false) }
     var currentLocation by remember { mutableStateOf<Location?>(null) }
-    var routePoints by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+    var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var totalDistance by remember { mutableStateOf(0.0) }
     var elapsedTime by remember { mutableStateOf(0L) }
     var hasLocationPermission by remember { mutableStateOf(false) }
+
+    // Camera position per Google Maps
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(42.5, 12.5), 6f)
+    }
 
     // Client per il servizio di localizzazione
     val fusedLocationClient = remember {
@@ -73,7 +67,6 @@ fun TripTrackingScreen(
 
     // Controlla i permessi all'avvio
     LaunchedEffect(Unit) {
-        Configuration.getInstance().userAgentValue = context.packageName
         hasLocationPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -84,13 +77,21 @@ fun TripTrackingScreen(
     LaunchedEffect(isTracking) {
         if (isTracking) {
             while (isTracking) {
-                delay(1000) // Aggiorna ogni secondo
+                delay(1000)
                 elapsedTime += 1
             }
         }
     }
 
-    // Launcher per richiedere i permessi di localizzazione
+    // Aggiorna la camera quando cambia la posizione durante il tracking
+    LaunchedEffect(currentLocation, isTracking) {
+        if (isTracking && currentLocation != null) {
+            val newPosition = LatLng(currentLocation!!.latitude, currentLocation!!.longitude)
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(newPosition, 15f)
+        }
+    }
+
+    // Launcher per richiedere i permessi
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -106,7 +107,7 @@ fun TripTrackingScreen(
                     currentLocation = location
 
                     if (isTracking) {
-                        val newPoint = GeoPoint(location.latitude, location.longitude)
+                        val newPoint = LatLng(location.latitude, location.longitude)
 
                         // Calcola la distanza dal punto precedente
                         if (routePoints.isNotEmpty()) {
@@ -147,10 +148,9 @@ fun TripTrackingScreen(
         totalDistance = 0.0
         elapsedTime = 0L
 
-        // Richiesta di aggiornamenti GPS
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
-            5000 // Aggiorna ogni 5 secondi
+            5000
         ).setMinUpdateIntervalMillis(2000).build()
 
         try {
@@ -160,16 +160,15 @@ fun TripTrackingScreen(
                 null
             )
         } catch (e: SecurityException) {
-            // Gestisci l'eccezione di permessi
+            // Gestisci l'eccezione
         }
     }
 
-    // Funzione per fermare il tracciamento e salvare
+    // Funzione per fermare il tracciamento
     fun stopTracking() {
         isTracking = false
         fusedLocationClient.removeLocationUpdates(locationCallback)
 
-        // Salva i dati nel viaggio
         selectedTrip?.let { trip ->
             val updatedTrip = trip.copy(
                 totalDistanceKm = totalDistance,
@@ -232,7 +231,7 @@ fun TripTrackingScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Selettore viaggio (se non sta tracciando)
+            // Selettore viaggio
             if (!isTracking && selectedTrip == null) {
                 TripSelector(
                     trips = uiState.tripList.filter { !it.isCompleted },
@@ -240,7 +239,7 @@ fun TripTrackingScreen(
                 )
             }
 
-            // Pannello informazioni viaggio selezionato
+            // Pannello informazioni viaggio
             selectedTrip?.let { trip ->
                 TripInfoPanel(
                     trip = trip,
@@ -250,19 +249,44 @@ fun TripTrackingScreen(
                 )
             }
 
-            // Mappa
+            // Google Map
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                TrackingMapView(
-                    currentLocation = currentLocation,
-                    routePoints = routePoints,
-                    isTracking = isTracking
-                )
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraPositionState,
+                    properties = MapProperties(
+                        isMyLocationEnabled = hasLocationPermission
+                    ),
+                    uiSettings = MapUiSettings(
+                        zoomControlsEnabled = true,
+                        myLocationButtonEnabled = hasLocationPermission
+                    )
+                ) {
+                    // Marker posizione corrente
+                    currentLocation?.let { location ->
+                        Marker(
+                            state = rememberMarkerState(
+                                position = LatLng(location.latitude, location.longitude)
+                            ),
+                            title = "Posizione Attuale"
+                        )
+                    }
 
-                // Messaggio se non ci sono permessi
+                    // Disegna il percorso
+                    if (routePoints.isNotEmpty()) {
+                        Polyline(
+                            points = routePoints,
+                            color = TravelGreen,
+                            width = 8f
+                        )
+                    }
+                }
+
+                // Messaggio permessi
                 if (!hasLocationPermission) {
                     Card(
                         modifier = Modifier
@@ -277,10 +301,7 @@ fun TripTrackingScreen(
                             modifier = Modifier.padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = "📍",
-                                fontSize = 48.sp
-                            )
+                            Text(text = "📍", fontSize = 48.sp)
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "Permesso GPS Richiesto",
@@ -311,9 +332,8 @@ fun TripTrackingScreen(
     }
 }
 
-/**
- * Selettore per scegliere quale viaggio tracciare.
- */
+// === COMPONENTI RIUTILIZZABILI (invariati) ===
+
 @Composable
 fun TripSelector(
     trips: List<Trip>,
@@ -344,10 +364,7 @@ fun TripSelector(
                 )
             } else {
                 trips.forEach { trip ->
-                    TripSelectorItem(
-                        trip = trip,
-                        onClick = { onTripSelected(trip) }
-                    )
+                    TripSelectorItem(trip = trip, onClick = { onTripSelected(trip) })
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
@@ -355,14 +372,8 @@ fun TripSelector(
     }
 }
 
-/**
- * Singolo elemento nella lista di selezione viaggi.
- */
 @Composable
-fun TripSelectorItem(
-    trip: Trip,
-    onClick: () -> Unit
-) {
+fun TripSelectorItem(trip: Trip, onClick: () -> Unit) {
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
 
     Surface(
@@ -402,9 +413,6 @@ fun TripSelectorItem(
     }
 }
 
-/**
- * Pannello con le informazioni del viaggio in corso.
- */
 @Composable
 fun TripInfoPanel(
     trip: Trip,
@@ -456,14 +464,12 @@ fun TripInfoPanel(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                // Distanza
                 StatisticItem(
                     label = "Distanza",
                     value = "${String.format("%.2f", distance)} km",
                     icon = "🗺️"
                 )
 
-                // Tempo
                 val hours = elapsedTime / 3600
                 val minutes = (elapsedTime % 3600) / 60
                 val seconds = elapsedTime % 60
@@ -477,18 +483,9 @@ fun TripInfoPanel(
     }
 }
 
-/**
- * Elemento statistico (distanza, tempo, ecc).
- */
 @Composable
-fun StatisticItem(
-    label: String,
-    value: String,
-    icon: String
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+fun StatisticItem(label: String, value: String, icon: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = icon, fontSize = 24.sp)
         Text(
             text = value,
@@ -504,66 +501,6 @@ fun StatisticItem(
     }
 }
 
-/**
- * Mappa che mostra la posizione corrente e il percorso.
- */
-@Composable
-fun TrackingMapView(
-    currentLocation: Location?,
-    routePoints: List<GeoPoint>,
-    isTracking: Boolean
-) {
-    AndroidView(
-        factory = { context ->
-            MapView(context).apply {
-                setTileSource(TileSourceFactory.MAPNIK)
-                setMultiTouchControls(true)
-
-                // Zoom iniziale sull'Italia
-                controller.setZoom(6.0)
-                controller.setCenter(GeoPoint(42.5, 12.5))
-            }
-        },
-        update = { mapView ->
-            mapView.overlays.clear()
-
-            // Mostra posizione corrente
-            currentLocation?.let { location ->
-                val currentPoint = GeoPoint(location.latitude, location.longitude)
-
-                // Marker posizione corrente
-                val marker = Marker(mapView).apply {
-                    position = currentPoint
-                    title = "Posizione Attuale"
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                }
-                mapView.overlays.add(marker)
-
-                // Centra sulla posizione corrente se sta tracciando
-                if (isTracking) {
-                    mapView.controller.animateTo(currentPoint)
-                    mapView.controller.setZoom(15.0)
-                }
-            }
-
-            // Disegna il percorso
-            if (routePoints.isNotEmpty()) {
-                val polyline = Polyline().apply {
-                    setPoints(routePoints)
-                    outlinePaint.color = android.graphics.Color.parseColor("#008080")
-                    outlinePaint.strokeWidth = 8f
-                }
-                mapView.overlays.add(polyline)
-            }
-
-            mapView.invalidate()
-        }
-    )
-}
-
-/**
- * Pulsanti per controllare il tracciamento.
- */
 @Composable
 fun TrackingControls(
     isTracking: Boolean,
@@ -589,9 +526,7 @@ fun TrackingControls(
                         .height(56.dp)
                         .fillMaxWidth(0.8f),
                     shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = TravelGreen
-                    )
+                    colors = ButtonDefaults.buttonColors(containerColor = TravelGreen)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.PlayArrow,
@@ -612,9 +547,7 @@ fun TrackingControls(
                         .height(56.dp)
                         .fillMaxWidth(0.8f),
                     shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Red
-                    )
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Stop,
