@@ -18,7 +18,8 @@ import com.example.travelcompanionapp.ui.TripEntryScreen
 import com.example.travelcompanionapp.ui.SchermataIniziale
 import com.example.travelcompanionapp.ui.MainMenuScreen
 import com.example.travelcompanionapp.ui.MapSelectionScreen
-import com.example.travelcompanionapp.ui.TripListScreen // ⭐ NUOVA IMPORT
+import com.example.travelcompanionapp.ui.TripListScreen
+import com.example.travelcompanionapp.ui.TripTrackingScreen // â­ AGGIUNTO: Import per il tracking GPS
 import com.example.travelcompanionapp.ui.theme.TravelCompanionAppTheme
 import com.example.travelcompanionapp.viewmodel.TripViewModel
 
@@ -140,7 +141,7 @@ fun TravelCompanionNavHost(
             )
         }
 
-        // === 5. LISTA VIAGGI (⭐ NUOVA SCHERMATA) ===
+        // === 5. LISTA VIAGGI ===
         composable(Destinations.LIST_ROUTE) {
             TripListScreen(
                 viewModel = viewModel,
@@ -154,9 +155,13 @@ fun TravelCompanionNavHost(
             )
         }
 
-        // === 6. TRACCIAMENTO GPS (Placeholder - da implementare) ===
+        // === 6. TRACCIAMENTO GPS (â­ AGGIORNATO) ===
         composable(Destinations.TRACKING_ROUTE) {
-            PlaceholderScreen(title = "Inizia Viaggio")
+            TripTrackingScreen(
+                viewModel = viewModel,
+                // Torna al menu principale
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         // === 7. IMPOSTAZIONI BACKGROUND (Placeholder - da implementare) ===

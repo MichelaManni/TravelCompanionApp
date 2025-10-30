@@ -33,7 +33,7 @@ android {
 
     // === CORREZIONE DELL'ERRORE DI SINTASSI (KTS) ===
     compileOptions {
-        // La sintassi corretta in KTS per queste opzioni è l'assegnazione diretta nel blocco
+        // La sintassi corretta in KTS per queste opzioni Ã¨ l'assegnazione diretta nel blocco
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -53,7 +53,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation.android)
-
+    implementation("com.google.android.gms:play-services-location:21.0.1")
     // === JETPACK COMPOSE === //
     val composeBom = "2024.09.00" // Versione di Compose (BOM)
     implementation(platform("androidx.compose:compose-bom:$composeBom"))
