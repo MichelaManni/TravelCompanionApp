@@ -5,40 +5,132 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import android.content.Context
 import java.util.Date
+
 /**
  * La classe del database principale dell'applicazione, che estende RoomDatabase.
  *
- * Il parametro 'entities' elenca tutte le Entity (tabelle) del database.
- * 'version' deve essere incrementato ogni volta che la struttura delle Entity cambia.
- * Si usano TypeConverters per permettere a Room di salvare oggetti non primitivi (come Date).
+ * ⭐ AGGIORNAMENTO VERSIONE 3 -> 4:
+ * - Rinominato campo "notes" → "description" nella tabella trips
+ * - Aggiunta nuova tabella "trip_notes" per le note durante il viaggio
+ * - Implementate migrazioni per preservare i dati esistenti
+ *
+ * STORICO VERSIONI:
+ * - v1: Versione iniziale
+ * - v2: Aggiunte coordinate GPS
+ * - v3: Aggiunto campo notes
+ * - v4: Sistema note durante viaggio (notes→description + TripNote)
  */
-@Database(entities = [Trip::class], version = 2, exportSchema = false)// Configura il database: entità (Trip), versione (1), schema non esportato
-@TypeConverters(Converters::class) // Collega i TypeConverters al database
-abstract class AppDatabase : RoomDatabase() { // Definizione della classe astratta del database
-    abstract fun tripDao(): TripDao  // Metodo astratto per ottenere l'istanza del DAO
+@Database(
+    entities = [Trip::class, TripNote::class], // ⭐ Aggiunta TripNote
+    version = 4, // ⭐ INCREMENTATA DA 3 A 4
+    exportSchema = false
+)
+@TypeConverters(Converters::class)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun tripDao(): TripDao
+    abstract fun tripNoteDao(): TripNoteDao // ⭐ Nuovo DAO per le note
 
-    // AGGIUNTA DEL SINGLETON
-    companion object { // Blocco companion object per il pattern Singleton
-        // L'annotazione @Volatile assicura che il valore sia sempre aggiornato
-        // e lo rende immediatamente visibile a tutti i thread.
+    companion object {
         @Volatile
-        private var Instance: AppDatabase? = null  // Istanza singola del database, inizialmente null
+        private var Instance: AppDatabase? = null
 
-        // Funzione per ottenere l'unica istanza del database.
-        fun getDatabase(context: Context): AppDatabase {  // Metodo statico per accedere al database
-            // Se l'istanza è null, la crea, altrimenti restituisce quella esistente.
-            return Instance ?: synchronized(this) { // Usa l'operatore Elvis (?:) per restituire 'Instance' se non null, altrimenti esegue il blocco synchronized
-                // Il blocco synchronized previene l'accesso da più thread contemporaneamente
-                // Costruisce il database
-                Room.databaseBuilder(context, AppDatabase::class.java, "trip_database") // Crea il database builder
-                    .build()// Costruisce l'istanza del database
-                    .also { Instance = it }// Assegna l'istanza appena creata alla variabile 'Instance'
+        // === MIGRAZIONE DA VERSIONE 2 A VERSIONE 3 ===
+        // Aggiunge il campo "notes" alla tabella "trips"
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE trips ADD COLUMN notes TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
+
+        // === ⭐ MIGRAZIONE DA VERSIONE 3 A VERSIONE 4 ===
+        // Questa migrazione:
+        // 1. Rinomina "notes" in "description" nella tabella trips
+        // 2. Crea la nuova tabella "trip_notes" per le note durante il viaggio
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+
+                // PASSO 1: Creare tabella temporanea con la nuova struttura
+                database.execSQL("""
+                    CREATE TABLE trips_new (
+                        id INTEGER PRIMARY KEY NOT NULL,
+                        destination TEXT NOT NULL,
+                        destinationLat REAL,
+                        destinationLng REAL,
+                        startDate INTEGER NOT NULL,
+                        endDate INTEGER NOT NULL,
+                        tripType TEXT NOT NULL,
+                        totalDistanceKm REAL NOT NULL,
+                        isCompleted INTEGER NOT NULL,
+                        status TEXT NOT NULL,
+                        description TEXT NOT NULL DEFAULT ''
+                    )
+                """.trimIndent())
+
+                // PASSO 2: Copiare i dati dalla vecchia alla nuova tabella
+                // "notes" viene copiato in "description"
+                database.execSQL("""
+                    INSERT INTO trips_new (
+                        id, destination, destinationLat, destinationLng,
+                        startDate, endDate, tripType, totalDistanceKm,
+                        isCompleted, status, description
+                    )
+                    SELECT 
+                        id, destination, destinationLat, destinationLng,
+                        startDate, endDate, tripType, totalDistanceKm,
+                        isCompleted, status, notes
+                    FROM trips
+                """.trimIndent())
+
+                // PASSO 3: Eliminare la vecchia tabella
+                database.execSQL("DROP TABLE trips")
+
+                // PASSO 4: Rinominare la nuova tabella
+                database.execSQL("ALTER TABLE trips_new RENAME TO trips")
+
+                // PASSO 5: Creare la nuova tabella trip_notes
+                database.execSQL("""
+                    CREATE TABLE trip_notes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        tripId INTEGER NOT NULL,
+                        text TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        latitude REAL,
+                        longitude REAL,
+                        locationName TEXT,
+                        FOREIGN KEY(tripId) REFERENCES trips(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+
+                // PASSO 6: Creare indice per velocizzare le query su tripId
+                database.execSQL("""
+                    CREATE INDEX index_trip_notes_tripId ON trip_notes(tripId)
+                """.trimIndent())
+            }
+        }
+
+        /**
+         * Funzione per ottenere l'unica istanza del database (Singleton Pattern).
+         * Se l'istanza è null, la crea; altrimenti restituisce quella esistente.
+         */
+        fun getDatabase(context: Context): AppDatabase {
+            return Instance ?: synchronized(this) {
+                Room.databaseBuilder(
+                    context,
+                    AppDatabase::class.java,
+                    "trip_database"
+                )
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4) // ⭐ Aggiunte entrambe le migrazioni
+                    .build()
+                    .also { Instance = it }
             }
         }
     }
-    // === FINE AGGIUNTA DEL SINGLETON ===
 }
 
 /**
@@ -47,14 +139,14 @@ abstract class AppDatabase : RoomDatabase() { // Definizione della classe astrat
  */
 class Converters {
     // Converte un Long (timestamp) in un oggetto Date
-    @TypeConverter//definisce questo metodo come un Type Converter
-    fun fromTimestamp(value: Long?): Date? {// Metodo per convertire Long (timestamp) in Date
-        return value?.let { Date(it) }// Se 'value' non è null, crea una nuova Date con quel timestamp
+    @TypeConverter
+    fun fromTimestamp(value: Long?): Date? {
+        return value?.let { Date(it) }
     }
 
     // Converte un oggetto Date in un Long (timestamp)
     @TypeConverter
-    fun dateToTimestamp(date: Date?): Long? {// Metodo per convertire Date in Long (timestamp)
-        return date?.time// Restituisce il timestamp (millisecondi) della Date, se non null
+    fun dateToTimestamp(date: Date?): Long? {
+        return date?.time
     }
 }

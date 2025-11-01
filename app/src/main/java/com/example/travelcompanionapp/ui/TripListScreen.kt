@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +30,8 @@ import java.util.*
 /**
  * Schermata principale per visualizzare la lista dei viaggi salvati.
  * Mostra tutti i viaggi con possibilità di filtro per tipo.
+ *
+ * ⭐ AGGIORNAMENTO: Ora visualizza anche le note dei viaggi
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -208,14 +211,16 @@ fun TripListScreen(
 
 /**
  * Card che rappresenta un singolo viaggio nella lista.
- * Mostra destinazione, date, tipo e stato del viaggio.
+ * Mostra destinazione, date, tipo, stato, descrizione e NUMERO DI NOTE.
+ *
+ * ⭐ AGGIORNAMENTO: Badge con numero di note
  */
 @Composable
 fun TripCard(
-    trip: Trip, // Dati del viaggio da visualizzare
-    onClick: () -> Unit // Funzione chiamata quando clicchi sulla card
+    trip: Trip,
+    onClick: () -> Unit,
+    noteCount: Int = 0 // ⭐ NUOVO parametro
 ) {
-    // Formattatore per le date (es: 25/12/2024)
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
 
     Card(
@@ -288,6 +293,40 @@ fun TripCard(
 
                 // Badge per lo stato del viaggio
                 StatusBadge(status = trip.status)
+            }
+
+            // ⭐ RIGA 3.5: Descrizione (se presente)
+            if (trip.description.isNotBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Card interna per la descrizione con sfondo leggero
+                Surface(
+                    color = TravelGreen.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        // Icona descrizione
+                        Icon(
+                            imageVector = Icons.Filled.Notes,
+                            contentDescription = null,
+                            tint = TravelGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        // Testo della descrizione (max 3 righe)
+                        Text(
+                            text = trip.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.DarkGray,
+                            maxLines = 3, // Mostra max 3 righe, poi "..."
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
 
             // RIGA 4: Distanza (se presente e > 0)

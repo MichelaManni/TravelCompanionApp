@@ -10,22 +10,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 // Import per le schermate
-import com.example.travelcompanionapp.ui.TripEntryScreen
-import com.example.travelcompanionapp.ui.SchermataIniziale
-import com.example.travelcompanionapp.ui.MainMenuScreen
-import com.example.travelcompanionapp.ui.MapSelectionScreen
-import com.example.travelcompanionapp.ui.TripListScreen
-import com.example.travelcompanionapp.ui.TripTrackingScreen // â­ AGGIUNTO: Import per il tracking GPS
+import com.example.travelcompanionapp.ui.*
 import com.example.travelcompanionapp.ui.theme.TravelCompanionAppTheme
 import com.example.travelcompanionapp.viewmodel.TripViewModel
 
 /**
  * Definizioni costanti delle rotte di navigazione.
- * Usiamo costanti per evitare errori di battitura.
  */
 object Destinations {
     const val SPLASH_ROUTE = "splash_route"
@@ -35,6 +31,10 @@ object Destinations {
     const val TRACKING_ROUTE = "tracking_route"
     const val BACKGROUND_SETTINGS_ROUTE = "background_settings_route"
     const val MAP_SELECTION_ROUTE = "map_selection_route"
+    const val TRIP_DETAIL_ROUTE = "trip_detail_route/{tripId}" // ⭐ NUOVO
+
+    // ⭐ NUOVA funzione helper per creare la rotta con parametro
+    fun tripDetailRoute(tripId: Int) = "trip_detail_route/$tripId"
 }
 
 /**
@@ -50,15 +50,12 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // Otteniamo il repository dall'Application
                     val appRepository = (application as TravelCompanionApplication).repository
 
-                    // Creiamo il ViewModel usando il Factory pattern
                     val viewModel: TripViewModel = viewModel(
                         factory = TripViewModel.Factory(appRepository)
                     )
 
-                    // Avviamo il sistema di navigazione
                     TravelCompanionNavHost(viewModel = viewModel)
                 }
             }
@@ -69,27 +66,26 @@ class MainActivity : ComponentActivity() {
 /**
  * Sistema di navigazione dell'app.
  * Definisce tutte le schermate e come navigare tra loro.
+ *
+ * ⭐ AGGIORNAMENTO: Aggiunta TripDetailScreen
  */
 @Composable
 fun TravelCompanionNavHost(
     viewModel: TripViewModel
 ) {
-    // Controller per gestire la navigazione
     val navController = rememberNavController()
+    val uiState by viewModel.uiState.collectAsState()
 
-    // NavHost definisce tutte le "destinazioni" (schermate) dell'app
     NavHost(
         navController = navController,
-        startDestination = Destinations.SPLASH_ROUTE // Schermata iniziale
+        startDestination = Destinations.SPLASH_ROUTE
     ) {
 
-        // === 1. SPLASH SCREEN (Schermata di benvenuto) ===
+        // === 1. SPLASH SCREEN ===
         composable(Destinations.SPLASH_ROUTE) {
             SchermataIniziale(
                 onStartClick = {
-                    // Quando clicca "Start", vai al menu principale
                     navController.navigate(Destinations.MAIN_MENU_ROUTE) {
-                        // Rimuove lo splash dallo stack (non può tornare indietro)
                         popUpTo(Destinations.SPLASH_ROUTE) { inclusive = true }
                     }
                 }
@@ -99,19 +95,15 @@ fun TravelCompanionNavHost(
         // === 2. MENU PRINCIPALE ===
         composable(Destinations.MAIN_MENU_ROUTE) {
             MainMenuScreen(
-                // Quando clicca "Nuovo Viaggio"
                 onAddTripClick = {
                     navController.navigate(Destinations.ENTRY_ROUTE)
                 },
-                // Quando clicca "I Miei Viaggi"
                 onViewListClick = {
                     navController.navigate(Destinations.LIST_ROUTE)
                 },
-                // Quando clicca "Inizia Viaggio"
                 onStartTrackingClick = {
                     navController.navigate(Destinations.TRACKING_ROUTE)
                 },
-                // Quando clicca "Op. Avanzate"
                 onBackgroundSettingsClick = {
                     navController.navigate(Destinations.BACKGROUND_SETTINGS_ROUTE)
                 }
@@ -122,9 +114,7 @@ fun TravelCompanionNavHost(
         composable(Destinations.ENTRY_ROUTE) {
             TripEntryScreen(
                 viewModel = viewModel,
-                // Torna indietro al menu
                 onNavigateBack = { navController.popBackStack() },
-                // Apre la mappa per selezionare destinazione
                 onNavigateToMapSelection = {
                     navController.navigate(Destinations.MAP_SELECTION_ROUTE)
                 }
@@ -134,9 +124,7 @@ fun TravelCompanionNavHost(
         // === 4. SELEZIONE DESTINAZIONE SU MAPPA ===
         composable(Destinations.MAP_SELECTION_ROUTE) {
             MapSelectionScreen(
-                // Quando seleziona una posizione, salva nel ViewModel
                 onDestinationSelected = viewModel::updateDestinationCoordinates,
-                // Torna alla schermata precedente (TripEntryScreen)
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -145,26 +133,49 @@ fun TravelCompanionNavHost(
         composable(Destinations.LIST_ROUTE) {
             TripListScreen(
                 viewModel = viewModel,
-                // Torna al menu principale
                 onNavigateBack = { navController.popBackStack() },
-                // Quando clicca su un viaggio (TODO: implementare dettaglio)
                 onTripClick = { trip ->
-                    // Per ora non fa nulla, in futuro aprirà una schermata dettaglio
-                    // TODO: navigare a schermata dettaglio viaggio
+                    // ⭐ NUOVO: Naviga alla schermata dettaglio
+                    navController.navigate(Destinations.tripDetailRoute(trip.id))
                 }
             )
         }
 
-        // === 6. TRACCIAMENTO GPS (â­ AGGIORNATO) ===
+        // === 6. ⭐ NUOVO: DETTAGLIO VIAGGIO ===
+        composable(
+            route = Destinations.TRIP_DETAIL_ROUTE,
+            arguments = listOf(
+                navArgument("tripId") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getInt("tripId") ?: return@composable
+
+            // Trova il viaggio nell lista
+            val trip = uiState.tripList.find { it.id == tripId }
+
+            if (trip != null) {
+                TripDetailScreen(
+                    trip = trip,
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            } else {
+                // Se il viaggio non esiste, torna indietro
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
+                }
+            }
+        }
+
+        // === 7. TRACCIAMENTO GPS ===
         composable(Destinations.TRACKING_ROUTE) {
             TripTrackingScreen(
                 viewModel = viewModel,
-                // Torna al menu principale
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        // === 7. IMPOSTAZIONI BACKGROUND (Placeholder - da implementare) ===
+        // === 8. IMPOSTAZIONI BACKGROUND (Placeholder) ===
         composable(Destinations.BACKGROUND_SETTINGS_ROUTE) {
             PlaceholderScreen(title = "Operazioni Avanzate")
         }
@@ -173,7 +184,6 @@ fun TravelCompanionNavHost(
 
 /**
  * Schermata segnaposto per le funzionalità non ancora implementate.
- * Mostra semplicemente un titolo e un messaggio.
  */
 @Composable
 fun PlaceholderScreen(title: String) {

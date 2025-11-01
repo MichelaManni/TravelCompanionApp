@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +32,9 @@ val TRIP_TYPES = listOf("Local trip", "Day trip", "Multi-day trip")
  * 1. Selezionare la destinazione dalla mappa
  * 2. Scegliere le date di inizio e fine
  * 3. Selezionare il tipo di viaggio
+ * 4. Aggiungere una descrizione opzionale (nota generale)
+ *
+ * ⭐ Le note DURANTE il viaggio verranno aggiunte nella schermata di tracking
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +64,6 @@ fun TripEntryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        // Icona animata accanto al titolo
                         LottieAnimation(
                             composition = headerComposition,
                             progress = headerProgress,
@@ -95,6 +98,7 @@ fun TripEntryScreen(
             onStartDateChange = viewModel::updateStartDate,
             onEndDateChange = viewModel::updateEndDate,
             onTripTypeChange = viewModel::updateTripType,
+            onDescriptionChange = viewModel::updateDescription, // ⭐ CORRETTO
             onSaveTrip = {
                 viewModel.saveTrip()
                 onNavigateBack()
@@ -110,7 +114,8 @@ fun TripEntryScreen(
 
 /**
  * Form per l'inserimento dei dati del viaggio.
- * Ora la destinazione si seleziona SOLO dalla mappa!
+ *
+ * ⭐ AGGIORNAMENTO: Campo "description" per la descrizione generale
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,6 +124,7 @@ fun TripEntryForm(
     onStartDateChange: (String) -> Unit,
     onEndDateChange: (String) -> Unit,
     onTripTypeChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit, // ⭐ CORRETTO
     onSaveTrip: () -> Unit,
     onOpenMapSelection: () -> Unit,
     modifier: Modifier = Modifier
@@ -136,7 +142,6 @@ fun TripEntryForm(
 
         // === SEZIONE DESTINAZIONE ===
 
-        // Se la destinazione NON è ancora stata selezionata
         if (uiState.destination.isBlank()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -175,7 +180,6 @@ fun TripEntryForm(
                 }
             }
         } else {
-            // Se la destinazione È stata selezionata, mostriamo le info
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -190,7 +194,6 @@ fun TripEntryForm(
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Icona posizione
                     Icon(
                         imageVector = Icons.Filled.LocationOn,
                         contentDescription = null,
@@ -209,7 +212,6 @@ fun TripEntryForm(
 
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        // Nome del luogo selezionato
                         Text(
                             text = uiState.destination,
                             fontWeight = FontWeight.Bold,
@@ -218,7 +220,6 @@ fun TripEntryForm(
                         )
                     }
 
-                    // Icona checkmark verde (conferma)
                     Surface(
                         color = TravelGreen,
                         shape = androidx.compose.foundation.shape.CircleShape,
@@ -237,7 +238,6 @@ fun TripEntryForm(
             }
         }
 
-        // Pulsante per aprire/cambiare la selezione dalla mappa
         Button(
             onClick = onOpenMapSelection,
             modifier = Modifier
@@ -269,13 +269,12 @@ fun TripEntryForm(
 
         // === SEZIONE DATE ===
 
-        // Campo Data Inizio
         OutlinedTextField(
             value = uiState.startDate,
             onValueChange = { },
             label = { Text("Data Inizio", color = Color.Black) },
             placeholder = { Text("Seleziona data", color = Color.Gray) },
-            readOnly = true, // Non editabile direttamente, si apre il DatePicker
+            readOnly = true,
             trailingIcon = {
                 IconButton(onClick = { showStartDatePicker = true }) {
                     Icon(
@@ -296,7 +295,6 @@ fun TripEntryForm(
             )
         )
 
-        // Campo Data Fine
         OutlinedTextField(
             value = uiState.endDate,
             onValueChange = { },
@@ -325,17 +323,53 @@ fun TripEntryForm(
 
         // === SEZIONE TIPO VIAGGIO ===
 
-        // Dropdown per scegliere il tipo di viaggio
         TripTypeDropdown(
             selectedType = uiState.tripType,
             onTypeSelected = onTripTypeChange
+        )
+
+        // === SEZIONE DESCRIZIONE ===
+
+        OutlinedTextField(
+            value = uiState.description,
+            onValueChange = onDescriptionChange,
+            label = { Text("Descrizione (Opzionale)", color = Color.Black) },
+            placeholder = {
+                Text(
+                    "Es: Weekend romantico, viaggio di lavoro, vacanza con amici...",
+                    color = Color.Gray
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    Icons.Filled.Notes,
+                    contentDescription = null,
+                    tint = TravelGreen
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp),
+            maxLines = 5,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                focusedBorderColor = TravelGreen,
+                unfocusedBorderColor = Color.Gray
+            )
+        )
+
+        Text(
+            text = "💡 Descrizione generale del viaggio. Durante il viaggio potrai aggiungere note specifiche!",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.Gray,
+            fontSize = 12.sp
         )
 
         Spacer(modifier = Modifier.weight(1f))
 
         // === PULSANTE SALVA ===
 
-        // Abilitato solo se tutti i campi sono compilati
         Button(
             onClick = onSaveTrip,
             enabled = uiState.isEntryValid,
@@ -356,16 +390,14 @@ fun TripEntryForm(
         }
     }
 
-    // === DIALOG PER LA SELEZIONE DELLE DATE ===
+    // === DIALOG DATE ===
 
-    // Dialog Data Inizio
     if (showStartDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        // Quando l'utente conferma la data
                         startDatePickerState.selectedDateMillis?.let { millis ->
                             val date = Date(millis)
                             val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
@@ -394,7 +426,6 @@ fun TripEntryForm(
         }
     }
 
-    // Dialog Data Fine
     if (showEndDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
@@ -430,10 +461,6 @@ fun TripEntryForm(
     }
 }
 
-/**
- * Dropdown menu per la selezione del tipo di viaggio.
- * Mostra le 3 opzioni: Local trip, Day trip, Multi-day trip
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripTypeDropdown(
