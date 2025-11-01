@@ -36,6 +36,11 @@ import java.util.*
 
 /**
  * Schermata per il tracciamento GPS di un viaggio con Google Maps.
+ *
+ * ⭐ MIGLIORAMENTI:
+ * - Distanza minima richiesta per salvare (0.1 km)
+ * - Dialog di conferma se la distanza è troppo bassa
+ * - Messaggio chiaro all'utente
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +59,9 @@ fun TripTrackingScreen(
     var totalDistance by remember { mutableStateOf(0.0) }
     var elapsedTime by remember { mutableStateOf(0L) }
     var hasLocationPermission by remember { mutableStateOf(false) }
+
+    // ⭐ NUOVO: Dialog per confermare salvataggio con distanza bassa
+    var showLowDistanceDialog by remember { mutableStateOf(false) }
 
     // Camera position per Google Maps
     val cameraPositionState = rememberCameraPositionState {
@@ -150,7 +158,7 @@ fun TripTrackingScreen(
 
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
-            5000
+            5000 // Aggiornamento ogni 5 secondi
         ).setMinUpdateIntervalMillis(2000).build()
 
         try {
@@ -164,11 +172,7 @@ fun TripTrackingScreen(
         }
     }
 
-    // Funzione per fermare il tracciamento
-    fun stopTracking() {
-        isTracking = false
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-
+    fun saveTrip() {
         selectedTrip?.let { trip ->
             val updatedTrip = trip.copy(
                 totalDistanceKm = totalDistance,
@@ -176,8 +180,30 @@ fun TripTrackingScreen(
                 isCompleted = true
             )
             viewModel.updateTrip(updatedTrip)
+
+            // Reset della schermata
+            selectedTrip = null
+            routePoints = emptyList()
+            totalDistance = 0.0
+            elapsedTime = 0L
         }
     }
+
+    // ⭐ NUOVA FUNZIONE: Verifica distanza prima di salvare
+    fun stopTracking() {
+        isTracking = false
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+
+        // ⭐ CONTROLLO: Distanza minima 0.1 km (100 metri)
+        if (totalDistance < 0.1) {
+            // Mostra dialog di conferma
+            showLowDistanceDialog = true
+        } else {
+            // Salva direttamente se la distanza è sufficiente
+            saveTrip()
+        }
+    }
+
 
     // Lottie Animation per il titolo
     val headerComposition by rememberLottieComposition(
@@ -328,6 +354,68 @@ fun TripTrackingScreen(
                     onStopClick = { stopTracking() }
                 )
             }
+        }
+
+        // ⭐ NUOVO: Dialog di conferma per distanza bassa
+        if (showLowDistanceDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showLowDistanceDialog = false
+                    // Reset senza salvare
+                    selectedTrip = null
+                    routePoints = emptyList()
+                    totalDistance = 0.0
+                    elapsedTime = 0L
+                },
+                icon = {
+                    Text(text = "⚠️", fontSize = 48.sp)
+                },
+                title = {
+                    Text(
+                        text = "Distanza Troppo Bassa",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Hai percorso solo ${String.format("%.0f", totalDistance * 1000)} metri.",
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Vuoi salvare comunque questo viaggio come completato?",
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showLowDistanceDialog = false
+                            saveTrip() // Salva comunque
+                        }
+                    ) {
+                        Text("Salva Comunque", color = TravelGreen)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showLowDistanceDialog = false
+                            // Reset senza salvare
+                            selectedTrip = null
+                            routePoints = emptyList()
+                            totalDistance = 0.0
+                            elapsedTime = 0L
+                        }
+                    ) {
+                        Text("Annulla", color = Color.Gray)
+                    }
+                },
+                containerColor = Color.White
+            )
         }
     }
 }
