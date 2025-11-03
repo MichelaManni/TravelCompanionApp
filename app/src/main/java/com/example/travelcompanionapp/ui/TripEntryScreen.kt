@@ -116,7 +116,7 @@ fun TripEntryScreen(
  *
  * ⭐ SCROLLING ABILITATO: verticalScroll() sulla Column principale
  */
-@OptIn(ExperimentalMaterial3Api::class) // ⭐ AGGIUNTO per DatePickerDialog
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripEntryForm(
     uiState: TripDetailsUiState,
@@ -165,15 +165,15 @@ fun TripEntryForm(
 
                 when (uiState.tripType) {
                     "Local trip" -> {
-                        if (durationDays > 1) "⚠️ Un viaggio locale dovrebbe durare max 1 giorno"
+                        if (durationDays > 1) "Un viaggio locale dovrebbe durare max 1 giorno"
                         else null
                     }
                     "Day trip" -> {
-                        if (durationDays != 1) "⚠️ Una gita giornaliera dovrebbe durare esattamente 1 giorno"
+                        if (durationDays != 1) "Una gita giornaliera dovrebbe durare esattamente 1 giorno"
                         else null
                     }
                     "Multi-day trip" -> {
-                        if (durationDays < 2) "⚠️ Un viaggio multi-giorno dovrebbe durare almeno 2 giorni"
+                        if (durationDays < 2) "Un viaggio multi-giorno dovrebbe durare almeno 2 giorni"
                         else null
                     }
                     else -> null
@@ -224,7 +224,7 @@ fun TripEntryForm(
                     Text(
                         "Inizia scegliendo dove vuoi andare dalla mappa",
                         fontSize = 14.sp,
-                        color = Color.Gray
+                        color = Color.DarkGray
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
@@ -267,7 +267,7 @@ fun TripEntryForm(
                         Text(
                             "Destinazione",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = Color.DarkGray
                         )
                         Text(
                             uiState.destination,
@@ -289,10 +289,15 @@ fun TripEntryForm(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Data Inizio
-            OutlinedCard(
+            // Data Inizio - ✅ SFONDO BIANCO AGGIUNTO
+            Card(
                 modifier = Modifier.weight(1f),
-                onClick = { showStartDatePicker = true }
+                onClick = { showStartDatePicker = true },
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White // ✅ Sfondo bianco
+                ),
+                elevation = CardDefaults.cardElevation(2.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Icon(
@@ -305,21 +310,26 @@ fun TripEntryForm(
                     Text(
                         "Data Inizio",
                         fontSize = 11.sp,
-                        color = Color.Gray
+                        color = Color.Gray // ✅ Etichetta grigia
                     )
                     Text(
                         if (uiState.startDate.isBlank()) "Seleziona" else uiState.startDate,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (uiState.startDate.isBlank()) Color.Gray else Color.Black
+                        color = if (uiState.startDate.isBlank()) Color.Gray else Color.Black // ✅ Testo nero
                     )
                 }
             }
 
-            // Data Fine
-            OutlinedCard(
+            // Data Fine - ✅ SFONDO BIANCO AGGIUNTO
+            Card(
                 modifier = Modifier.weight(1f),
-                onClick = { showEndDatePicker = true }
+                onClick = { showEndDatePicker = true },
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White // ✅ Sfondo bianco
+                ),
+                elevation = CardDefaults.cardElevation(2.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Icon(
@@ -332,13 +342,13 @@ fun TripEntryForm(
                     Text(
                         "Data Fine",
                         fontSize = 11.sp,
-                        color = Color.Gray
+                        color = Color.Gray // ✅ Etichetta grigia
                     )
                     Text(
                         if (uiState.endDate.isBlank()) "Seleziona" else uiState.endDate,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (uiState.endDate.isBlank()) Color.Gray else Color.Black
+                        color = if (uiState.endDate.isBlank()) Color.Gray else Color.Black // ✅ Testo nero
                     )
                 }
             }
@@ -522,7 +532,7 @@ fun TripEntryForm(
         Spacer(modifier = Modifier.height(16.dp))
     }
 
-    // Date Pickers
+    // Date Pickers con sfondo bianco e testo nero
     if (showStartDatePicker) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -537,16 +547,37 @@ fun TripEntryForm(
                         showStartDatePicker = false
                     }
                 ) {
-                    Text("OK", color = TravelGreen)
+                    Text("OK", color = TravelGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showStartDatePicker = false }) {
-                    Text("Annulla", color = Color.Gray)
+                    Text("Annulla", color = Color.DarkGray)
                 }
-            }
+            },
+            colors = DatePickerDefaults.colors(
+                containerColor = Color.White
+            )
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor = Color.White,
+                    titleContentColor = Color.Black,
+                    headlineContentColor = Color.Black,
+                    weekdayContentColor = Color.Black,
+                    subheadContentColor = Color.Black,
+                    yearContentColor = Color.Black,
+                    currentYearContentColor = TravelGreen,
+                    selectedYearContentColor = Color.White,
+                    selectedYearContainerColor = TravelGreen,
+                    dayContentColor = Color.Black,
+                    selectedDayContentColor = Color.White,
+                    selectedDayContainerColor = TravelGreen,
+                    todayContentColor = TravelGreen,
+                    todayDateBorderColor = TravelGreen
+                )
+            )
         }
     }
 
@@ -564,16 +595,37 @@ fun TripEntryForm(
                         showEndDatePicker = false
                     }
                 ) {
-                    Text("OK", color = TravelGreen)
+                    Text("OK", color = TravelGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showEndDatePicker = false }) {
-                    Text("Annulla", color = Color.Gray)
+                    Text("Annulla", color = Color.DarkGray)
                 }
-            }
+            },
+            colors = DatePickerDefaults.colors(
+                containerColor = Color.White
+            )
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor = Color.White,
+                    titleContentColor = Color.Black,
+                    headlineContentColor = Color.Black,
+                    weekdayContentColor = Color.Black,
+                    subheadContentColor = Color.Black,
+                    yearContentColor = Color.Black,
+                    currentYearContentColor = TravelGreen,
+                    selectedYearContentColor = Color.White,
+                    selectedYearContainerColor = TravelGreen,
+                    dayContentColor = Color.Black,
+                    selectedDayContentColor = Color.White,
+                    selectedDayContainerColor = TravelGreen,
+                    todayContentColor = TravelGreen,
+                    todayDateBorderColor = TravelGreen
+                )
+            )
         }
     }
 }

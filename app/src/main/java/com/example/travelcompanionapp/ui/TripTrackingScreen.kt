@@ -310,137 +310,151 @@ fun TripTrackingScreen(
                 )
             )
         },
-        // ⭐ NUOVO: Floating Action Button per aggiungere note
-        floatingActionButton = {
-            if (selectedTrip != null) {
-                FloatingActionButton(
-                    onClick = { showAddNoteDialog = true },
-                    containerColor = TravelGreen,
-                    contentColor = Color.White
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = "Aggiungi Nota",
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-        }
+        // ⭐ Floating Action Button rimosso per evitare sovrapposizioni
+        // Il pulsante per aggiungere note è ora integrato nella UI
     ) { paddingValues ->
-        Column(
+
+        // ✅ SOLUZIONE: Box per contenere tutto con layout verticale fisso
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Selettore viaggio
-            if (!isTracking && selectedTrip == null) {
-                TripSelector(
-                    trips = uiState.tripList.filter { !it.isCompleted },
-                    onTripSelected = { selectedTrip = it }
-                )
-            }
-
-            // Pannello informazioni viaggio
-            selectedTrip?.let { trip ->
-                TripInfoPanel(
-                    trip = trip,
-                    isTracking = isTracking,
-                    distance = totalDistance,
-                    elapsedTime = elapsedTime
-                )
-
-                // ⭐ NUOVO: Mostra le ultime 3 note
-                if (recentNotes.isNotEmpty()) {
-                    RecentNotesPanel(notes = recentNotes)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-        // Sezione Foto
-            selectedTrip?.let { trip ->
-                PhotoCaptureSection(
-                    tripId = trip.id,
-                    currentLocation = currentLocation,
-                    viewModel = viewModel
-                )
-            }
-
-            // Google Map
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                GoogleMap(
-                    modifier = Modifier.fillMaxSize(),
-                    cameraPositionState = cameraPositionState,
-                    properties = MapProperties(
-                        isMyLocationEnabled = hasLocationPermission
-                    ),
-                    uiSettings = MapUiSettings(
-                        zoomControlsEnabled = true,
-                        myLocationButtonEnabled = hasLocationPermission
-                    )
+                // 🔹 PARTE SCROLLABILE: Contiene le info che possono crescere
+                // Occupa lo spazio necessario ma lascia sempre spazio alla mappa
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false) // Non forza a riempire tutto lo spazio
                 ) {
-                    currentLocation?.let { location ->
-                        Marker(
-                            state = rememberMarkerState(
-                                position = LatLng(location.latitude, location.longitude)
-                            ),
-                            title = "Posizione Attuale"
-                        )
-                    }
-
-                    if (routePoints.isNotEmpty()) {
-                        Polyline(
-                            points = routePoints,
-                            color = TravelGreen,
-                            width = 8f
-                        )
-                    }
-                }
-
-                if (!hasLocationPermission) {
-                    Card(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color.White
-                        ),
-                        elevation = CardDefaults.cardElevation(8.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(text = "📍", fontSize = 48.sp)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Permesso GPS Richiesto",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
+                    // Selettore viaggio (solo se non sta tracciando e nessun viaggio selezionato)
+                    if (!isTracking && selectedTrip == null) {
+                        item {
+                            TripSelector(
+                                trips = uiState.tripList.filter { !it.isCompleted },
+                                onTripSelected = { selectedTrip = it }
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Per tracciare il viaggio serve accedere alla posizione",
-                                color = Color.Gray,
-                                fontSize = 14.sp
+                        }
+                    }
+
+                    // Pannello informazioni viaggio
+                    selectedTrip?.let { trip ->
+                        item {
+                            TripInfoPanel(
+                                trip = trip,
+                                isTracking = isTracking,
+                                distance = totalDistance,
+                                elapsedTime = elapsedTime
+                            )
+                        }
+
+                        // 🔹 NUOVO: Pulsante per aggiungere nota (stesso stile delle foto)
+                        item {
+                            AddNoteButton(
+                                onClick = { showAddNoteDialog = true }
+                            )
+                        }
+
+                        // ⭐ NUOVO: Mostra le ultime 3 note
+                        if (recentNotes.isNotEmpty()) {
+                            item {
+                                RecentNotesPanel(notes = recentNotes)
+                            }
+                        }
+
+                        // Sezione Foto
+                        item {
+                            PhotoCaptureSection(
+                                tripId = trip.id,
+                                currentLocation = currentLocation,
+                                viewModel = viewModel
                             )
                         }
                     }
                 }
-            }
 
-            // Pulsanti di controllo
-            if (selectedTrip != null) {
-                TrackingControls(
-                    isTracking = isTracking,
-                    hasPermission = hasLocationPermission,
-                    onStartClick = { startTracking() },
-                    onStopClick = { stopTracking() }
-                )
+                // 🔹 MAPPA: Altezza fissa per garantire che sia sempre visibile
+                // Anche quando ci sono molte note/foto sopra
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp) // Altezza fissa: la mappa sarà sempre 300dp
+                ) {
+                    GoogleMap(
+                        modifier = Modifier.fillMaxSize(),
+                        cameraPositionState = cameraPositionState,
+                        properties = MapProperties(
+                            isMyLocationEnabled = hasLocationPermission
+                        ),
+                        uiSettings = MapUiSettings(
+                            zoomControlsEnabled = true,
+                            myLocationButtonEnabled = hasLocationPermission
+                        )
+                    ) {
+                        currentLocation?.let { location ->
+                            Marker(
+                                state = rememberMarkerState(
+                                    position = LatLng(location.latitude, location.longitude)
+                                ),
+                                title = "Posizione Attuale"
+                            )
+                        }
+
+                        if (routePoints.isNotEmpty()) {
+                            Polyline(
+                                points = routePoints,
+                                color = TravelGreen,
+                                width = 8f
+                            )
+                        }
+                    }
+
+                    // Messaggio permessi GPS se mancanti
+                    if (!hasLocationPermission) {
+                        Card(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.White
+                            ),
+                            elevation = CardDefaults.cardElevation(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(text = "📍", fontSize = 48.sp)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Permesso GPS Richiesto",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Per tracciare il viaggio serve accedere alla posizione",
+                                    color = Color.Gray,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 🔹 PULSANTI DI CONTROLLO: Sempre visibili in fondo
+                // Altezza fissa per evitare deformazioni
+                if (selectedTrip != null) {
+                    TrackingControls(
+                        isTracking = isTracking,
+                        hasPermission = hasLocationPermission,
+                        onStartClick = { startTracking() },
+                        onStopClick = { stopTracking() }
+                    )
+                }
             }
         }
 
@@ -572,8 +586,9 @@ fun AddNoteDialog(
         title = {
             Text(
                 text = "Aggiungi Nota",
-                fontWeight = FontWeight.Bold
-            )
+                fontWeight = FontWeight.Bold,
+
+                )
         },
         text = {
             Column {
@@ -589,7 +604,9 @@ fun AddNoteDialog(
                     maxLines = 5,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = TravelGreen,
-                        unfocusedBorderColor = Color.Gray
+                        unfocusedBorderColor = Color.Gray,
+                        unfocusedTextColor = Color.Black,
+                        focusedTextColor = Color.Black
                     )
                 )
 
@@ -610,14 +627,14 @@ fun AddNoteDialog(
                         Text(
                             text = "Posizione GPS registrata",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = Color.DarkGray
                         )
                     }
                 } else {
                     Text(
                         text = "⚠️ GPS non disponibile",
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = Color.DarkGray
                     )
                 }
 
@@ -651,11 +668,61 @@ fun AddNoteDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Annulla", color = Color.Gray)
+                Text("Annulla", color = Color.DarkGray)
             }
         },
         containerColor = Color.White
     )
+}
+
+// === COMPONENTI ESISTENTI (invariati) ===
+
+// 🔹 NUOVO: Pulsante per aggiungere nota con lo stesso stile della sezione foto
+@Composable
+fun AddNoteButton(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "📝 Aggiungi Note",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = TravelGreen
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TravelGreen
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "Aggiungi Nota",
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Scrivi una Nota",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
 }
 
 // === COMPONENTI ESISTENTI (invariati) ===
@@ -834,16 +901,20 @@ fun TrackingControls(
     onStartClick: () -> Unit,
     onStopClick: () -> Unit
 ) {
+    // ✅ SOLUZIONE: Surface con altezza fissa per evitare deformazioni
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(88.dp), // Altezza fissa per stabilità
         color = Color.White,
         shadowElevation = 8.dp
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             if (!isTracking) {
                 Button(
