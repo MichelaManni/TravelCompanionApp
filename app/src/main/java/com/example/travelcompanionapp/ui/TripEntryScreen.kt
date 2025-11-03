@@ -1,13 +1,15 @@
 package com.example.travelcompanionapp.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcompanionapp.viewmodel.TripViewModel
 import com.example.travelcompanionapp.viewmodel.TripDetailsUiState
+import com.example.travelcompanionapp.utils.TripTypeLogic
 import java.text.SimpleDateFormat
 import java.util.*
 import com.example.travelcompanionapp.R
@@ -28,13 +31,12 @@ val TRIP_TYPES = listOf("Local trip", "Day trip", "Multi-day trip")
 
 /**
  * Schermata per l'inserimento di un nuovo viaggio.
- * L'utente deve:
- * 1. Selezionare la destinazione dalla mappa
- * 2. Scegliere le date di inizio e fine
- * 3. Selezionare il tipo di viaggio
- * 4. Aggiungere una descrizione opzionale (nota generale)
  *
- * ⭐ Le note DURANTE il viaggio verranno aggiunte nella schermata di tracking
+ * ⭐ AGGIORNAMENTI:
+ * - Aggiunto scrolling verticale per evitare pulsanti nascosti
+ * - Validazione intelligente del tipo di viaggio
+ * - Suggerimenti automatici in base a date e distanza
+ * - Warning se tipo viaggio non corrisponde alla durata
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,16 +100,13 @@ fun TripEntryScreen(
             onStartDateChange = viewModel::updateStartDate,
             onEndDateChange = viewModel::updateEndDate,
             onTripTypeChange = viewModel::updateTripType,
-            onDescriptionChange = viewModel::updateDescription, // ⭐ CORRETTO
-            onSaveTrip = {
+            onDescriptionChange = viewModel::updateDescription,
+            onSave = {
                 viewModel.saveTrip()
                 onNavigateBack()
             },
-            onOpenMapSelection = onNavigateToMapSelection,
-            modifier = Modifier
-                .padding(paddingValues)
-                .padding(16.dp)
-                .fillMaxSize()
+            onNavigateToMapSelection = onNavigateToMapSelection,
+            modifier = Modifier.padding(paddingValues)
         )
     }
 }
@@ -115,28 +114,82 @@ fun TripEntryScreen(
 /**
  * Form per l'inserimento dei dati del viaggio.
  *
- * ⭐ AGGIORNAMENTO: Campo "description" per la descrizione generale
+ * ⭐ SCROLLING ABILITATO: verticalScroll() sulla Column principale
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class) // ⭐ AGGIUNTO per DatePickerDialog
 @Composable
 fun TripEntryForm(
     uiState: TripDetailsUiState,
     onStartDateChange: (String) -> Unit,
     onEndDateChange: (String) -> Unit,
     onTripTypeChange: (String) -> Unit,
-    onDescriptionChange: (String) -> Unit, // ⭐ CORRETTO
-    onSaveTrip: () -> Unit,
-    onOpenMapSelection: () -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onNavigateToMapSelection: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Stati per i DatePicker
-    val startDatePickerState = rememberDatePickerState()
-    val endDatePickerState = rememberDatePickerState()
+    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
+
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
 
+    // Stato per scrolling
+    val scrollState = rememberScrollState()
+
+    // Calcola suggerimento tipo viaggio
+    val suggestedTripType = remember(uiState.startDate, uiState.endDate) {
+        if (uiState.startDate.isNotBlank() && uiState.endDate.isNotBlank()) {
+            try {
+                val startDate = dateFormatter.parse(uiState.startDate)
+                val endDate = dateFormatter.parse(uiState.endDate)
+                if (startDate != null && endDate != null) {
+                    TripTypeLogic.suggestTripType(startDate, endDate)
+                } else null
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
+    // Calcola warning se tipo non corrisponde
+    val tripTypeWarning = remember(uiState.startDate, uiState.endDate, uiState.tripType) {
+        if (uiState.startDate.isNotBlank() &&
+            uiState.endDate.isNotBlank() &&
+            uiState.tripType.isNotBlank()) {
+            try {
+                val startDate = dateFormatter.parse(uiState.startDate)!!
+                val endDate = dateFormatter.parse(uiState.endDate)!!
+                val durationDays = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(
+                    endDate.time - startDate.time
+                ).toInt() + 1
+
+                when (uiState.tripType) {
+                    "Local trip" -> {
+                        if (durationDays > 1) "⚠️ Un viaggio locale dovrebbe durare max 1 giorno"
+                        else null
+                    }
+                    "Day trip" -> {
+                        if (durationDays != 1) "⚠️ Una gita giornaliera dovrebbe durare esattamente 1 giorno"
+                        else null
+                    }
+                    "Multi-day trip" -> {
+                        if (durationDays < 2) "⚠️ Un viaggio multi-giorno dovrebbe durare almeno 2 giorni"
+                        else null
+                    }
+                    else -> null
+                }
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
+    // SCROLLING ABILITATO QUI
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
@@ -160,38 +213,47 @@ fun TripEntryForm(
                         tint = TravelGreen,
                         modifier = Modifier.size(48.dp)
                     )
-
                     Spacer(modifier = Modifier.height(12.dp))
-
                     Text(
-                        text = "Nessuna destinazione selezionata",
+                        "Seleziona Destinazione",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = Color.Black
+                        fontSize = 18.sp,
+                        color = TravelGreen
                     )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Tocca il pulsante qui sotto per scegliere un luogo dalla mappa",
+                        "Inizia scegliendo dove vuoi andare dalla mappa",
                         fontSize = 14.sp,
                         color = Color.Gray
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onNavigateToMapSelection,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = TravelGreen
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LocationOn,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Apri Mappa")
+                    }
                 }
             }
         } else {
+            // Destinazione selezionata
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = Color.White
                 ),
-                elevation = CardDefaults.cardElevation(4.dp),
+                elevation = CardDefaults.cardElevation(2.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -200,208 +262,277 @@ fun TripEntryForm(
                         tint = TravelGreen,
                         modifier = Modifier.size(32.dp)
                     )
-
                     Spacer(modifier = Modifier.width(12.dp))
-
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Destinazione",
-                            style = MaterialTheme.typography.labelMedium,
+                            "Destinazione",
+                            fontSize = 12.sp,
                             color = Color.Gray
                         )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
                         Text(
-                            text = uiState.destination,
+                            uiState.destination,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
                             color = Color.Black
                         )
                     }
-
-                    Surface(
-                        color = TravelGreen,
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "✓",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
+                    TextButton(onClick = onNavigateToMapSelection) {
+                        Text("Cambia", color = TravelGreen)
                     }
                 }
             }
         }
 
-        Button(
-            onClick = onOpenMapSelection,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (uiState.destination.isBlank()) TravelGreen else Color.LightGray
-            )
-        ) {
-            Icon(
-                Icons.Filled.LocationOn,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = if (uiState.destination.isBlank()) {
-                    "Scegli Destinazione dalla Mappa"
-                } else {
-                    "Cambia Destinazione"
-                },
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
         // === SEZIONE DATE ===
 
-        OutlinedTextField(
-            value = uiState.startDate,
-            onValueChange = { },
-            label = { Text("Data Inizio", color = Color.Black) },
-            placeholder = { Text("Seleziona data", color = Color.Gray) },
-            readOnly = true,
-            trailingIcon = {
-                IconButton(onClick = { showStartDatePicker = true }) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Data Inizio
+            OutlinedCard(
+                modifier = Modifier.weight(1f),
+                onClick = { showStartDatePicker = true }
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Icon(
-                        Icons.Filled.DateRange,
-                        contentDescription = "Seleziona Data Inizio",
-                        tint = TravelGreen
+                        imageVector = Icons.Filled.DateRange,
+                        contentDescription = null,
+                        tint = TravelGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Data Inizio",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        if (uiState.startDate.isBlank()) "Seleziona" else uiState.startDate,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (uiState.startDate.isBlank()) Color.Gray else Color.Black
                     )
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black,
-                disabledTextColor = Color.Black,
-                focusedBorderColor = TravelGreen,
-                unfocusedBorderColor = Color.Gray
-            )
-        )
+            }
 
-        OutlinedTextField(
-            value = uiState.endDate,
-            onValueChange = { },
-            label = { Text("Data Fine", color = Color.Black) },
-            placeholder = { Text("Seleziona data", color = Color.Gray) },
-            readOnly = true,
-            trailingIcon = {
-                IconButton(onClick = { showEndDatePicker = true }) {
+            // Data Fine
+            OutlinedCard(
+                modifier = Modifier.weight(1f),
+                onClick = { showEndDatePicker = true }
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Icon(
-                        Icons.Filled.DateRange,
-                        contentDescription = "Seleziona Data Fine",
-                        tint = TravelGreen
+                        imageVector = Icons.Filled.DateRange,
+                        contentDescription = null,
+                        tint = TravelGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Data Fine",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        if (uiState.endDate.isBlank()) "Seleziona" else uiState.endDate,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (uiState.endDate.isBlank()) Color.Gray else Color.Black
                     )
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black,
-                disabledTextColor = Color.Black,
-                focusedBorderColor = TravelGreen,
-                unfocusedBorderColor = Color.Gray
-            )
-        )
+            }
+        }
+
+        // Suggerimento tipo viaggio
+        if (suggestedTripType != null && uiState.tripType.isBlank()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFE3F2FD)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = null,
+                        tint = Color(0xFF1976D2),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Suggerimento",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1976D2)
+                        )
+                        Text(
+                            "In base alle date, ti suggeriamo: ${TripTypeLogic.getTripTypeEmoji(suggestedTripType)} $suggestedTripType",
+                            fontSize = 13.sp,
+                            color = Color(0xFF424242)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Warning tipo viaggio
+        if (tripTypeWarning != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFFFF3E0)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        "⚠️",
+                        fontSize = 20.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        tripTypeWarning,
+                        fontSize = 13.sp,
+                        color = Color(0xFFE65100)
+                    )
+                }
+            }
+        }
 
         // === SEZIONE TIPO VIAGGIO ===
 
-        TripTypeDropdown(
-            selectedType = uiState.tripType,
-            onTypeSelected = onTripTypeChange
+        Text(
+            "Tipo di Viaggio",
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            color = Color.Black
         )
 
-        // === SEZIONE DESCRIZIONE ===
+        TRIP_TYPES.forEach { tripType ->
+            val isSelected = uiState.tripType == tripType
+            val emoji = TripTypeLogic.getTripTypeEmoji(tripType)
+            val description = TripTypeLogic.getTripTypeDescription(tripType)
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSelected) {
+                        TravelGreen.copy(alpha = 0.2f)
+                    } else {
+                        Color.White
+                    }
+                ),
+                border = if (isSelected) {
+                    androidx.compose.foundation.BorderStroke(2.dp, TravelGreen)
+                } else {
+                    null
+                },
+                shape = RoundedCornerShape(12.dp),
+                onClick = { onTripTypeChange(tripType) }
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        emoji,
+                        fontSize = 32.sp
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            tripType,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = if (isSelected) TravelGreen else Color.Black
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            description,
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                    }
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Filled.LocationOn,
+                            contentDescription = null,
+                            tint = TravelGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // === SEZIONE DESCRIZIONE (OPZIONALE) ===
 
         OutlinedTextField(
             value = uiState.description,
             onValueChange = onDescriptionChange,
-            label = { Text("Descrizione (Opzionale)", color = Color.Black) },
-            placeholder = {
-                Text(
-                    "Es: Weekend romantico, viaggio di lavoro, vacanza con amici...",
-                    color = Color.Gray
-                )
-            },
+            label = { Text("Descrizione (opzionale)") },
+            placeholder = { Text("Es: Vacanza estiva con famiglia") },
             leadingIcon = {
                 Icon(
-                    Icons.Filled.Notes,
+                    imageVector = Icons.Filled.Notes,
                     contentDescription = null,
                     tint = TravelGreen
                 )
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp),
-            maxLines = 5,
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 4,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black,
                 focusedBorderColor = TravelGreen,
-                unfocusedBorderColor = Color.Gray
+                focusedLabelColor = TravelGreen,
+                cursorColor = TravelGreen
             )
         )
-
-        Text(
-            text = "💡 Descrizione generale del viaggio. Durante il viaggio potrai aggiungere note specifiche!",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.Gray,
-            fontSize = 12.sp
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
 
         // === PULSANTE SALVA ===
 
         Button(
-            onClick = onSaveTrip,
+            onClick = onSave,
             enabled = uiState.isEntryValid,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = TravelGreen,
                 disabledContainerColor = Color.Gray
-            )
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                text = "Salva Viaggio",
+                if (uiState.isEntryValid) "Crea Viaggio" else "Compila tutti i campi obbligatori",
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 8.dp)
             )
         }
+
+        // Spazio finale per garantire che l'ultimo pulsante non sia mai nascosto
+        Spacer(modifier = Modifier.height(16.dp))
     }
 
-    // === DIALOG DATE ===
-
+    // Date Pickers
     if (showStartDatePicker) {
+        val datePickerState = rememberDatePickerState()
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        startDatePickerState.selectedDateMillis?.let { millis ->
+                        datePickerState.selectedDateMillis?.let { millis ->
                             val date = Date(millis)
-                            val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
-                            onStartDateChange(formatter.format(date))
+                            onStartDateChange(dateFormatter.format(date))
                         }
                         showStartDatePicker = false
                     }
@@ -411,31 +542,24 @@ fun TripEntryForm(
             },
             dismissButton = {
                 TextButton(onClick = { showStartDatePicker = false }) {
-                    Text("Annulla")
+                    Text("Annulla", color = Color.Gray)
                 }
             }
         ) {
-            DatePicker(
-                state = startDatePickerState,
-                colors = DatePickerDefaults.colors(
-                    selectedDayContainerColor = TravelGreen,
-                    todayContentColor = TravelGreen,
-                    todayDateBorderColor = TravelGreen
-                )
-            )
+            DatePicker(state = datePickerState)
         }
     }
 
     if (showEndDatePicker) {
+        val datePickerState = rememberDatePickerState()
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        endDatePickerState.selectedDateMillis?.let { millis ->
+                        datePickerState.selectedDateMillis?.let { millis ->
                             val date = Date(millis)
-                            val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
-                            onEndDateChange(formatter.format(date))
+                            onEndDateChange(dateFormatter.format(date))
                         }
                         showEndDatePicker = false
                     }
@@ -445,74 +569,11 @@ fun TripEntryForm(
             },
             dismissButton = {
                 TextButton(onClick = { showEndDatePicker = false }) {
-                    Text("Annulla")
+                    Text("Annulla", color = Color.Gray)
                 }
             }
         ) {
-            DatePicker(
-                state = endDatePickerState,
-                colors = DatePickerDefaults.colors(
-                    selectedDayContainerColor = TravelGreen,
-                    todayContentColor = TravelGreen,
-                    todayDateBorderColor = TravelGreen
-                )
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun TripTypeDropdown(
-    selectedType: String,
-    onTypeSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val expanded = remember { mutableStateOf(false) }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded.value,
-        onExpandedChange = { expanded.value = !expanded.value },
-        modifier = modifier.fillMaxWidth()
-    ) {
-        OutlinedTextField(
-            modifier = Modifier
-                .exposedDropdownSize(true)
-                .fillMaxWidth()
-                .menuAnchor(),
-            readOnly = true,
-            value = selectedType,
-            onValueChange = {},
-            label = { Text("Tipo di Viaggio", color = Color.Black) },
-            trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value)
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black,
-                focusedBorderColor = TravelGreen,
-                unfocusedBorderColor = Color.Gray
-            )
-        )
-
-        ExposedDropdownMenu(
-            expanded = expanded.value,
-            onDismissRequest = { expanded.value = false },
-            modifier = Modifier.background(Color.White)
-        ) {
-            TRIP_TYPES.forEach { selectionOption ->
-                DropdownMenuItem(
-                    text = { Text(selectionOption, color = Color.Black) },
-                    onClick = {
-                        onTypeSelected(selectionOption)
-                        expanded.value = false
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
-                    colors = MenuDefaults.itemColors(
-                        textColor = Color.Black
-                    )
-                )
-            }
+            DatePicker(state = datePickerState)
         }
     }
 }
