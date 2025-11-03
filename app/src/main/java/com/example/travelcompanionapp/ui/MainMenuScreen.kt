@@ -22,7 +22,8 @@ val LOTTIE_MAIN_ANIMATION = R.raw.logo_centrale_menu
 val LOTTIE_ADD_TRIP = R.raw.nuovo_viaggio_menu
 val LOTTIE_VIEW_LIST = R.raw.miei_viaggi_menu
 val LOTTIE_TRACKING = R.raw.inizia_viaggio_menu
-val LOTTIE_SETTINGS = R.raw.setting_menu
+
+val LOTTIE_DISPLAY = R.raw.display_charts_menu
 
 
 /**
@@ -115,8 +116,8 @@ fun MainMenuScreen(
             )
             Spacer(modifier = Modifier.width(16.dp)) // Spazio tra i due pulsanti
             MenuButton(
-                lottieResId = LOTTIE_SETTINGS,
-                label = "Op. Avanzate",
+                lottieResId = LOTTIE_DISPLAY,
+                label = "Display charts",
                 onClick = onBackgroundSettingsClick,
                 modifier = Modifier.weight(1f)
             )
