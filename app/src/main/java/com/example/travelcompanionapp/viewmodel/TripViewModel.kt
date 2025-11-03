@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.travelcompanionapp.data.Trip
 import com.example.travelcompanionapp.data.TripNote
+import com.example.travelcompanionapp.data.TripPhoto
 import com.example.travelcompanionapp.repository.TripRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,8 +19,7 @@ import java.util.*
  * Comunica con il Repository e fornisce i dati alle UI attraverso Flow e StateFlow.
  *
  * ⭐ AGGIORNAMENTO:
- * - Campo "notes" rinominato in "description" (descrizione generale del viaggio)
- * - Le note DURANTE il viaggio saranno gestite separatamente tramite TripNote
+ * - Aggiunta gestione completa delle foto
  */
 class TripViewModel(private val repository: TripRepository) : ViewModel() {
 
@@ -133,7 +133,6 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
     }
 
     /**
-     * ⭐ RINOMINATO: updateNotes → updateDescription
      * Aggiorna la descrizione generale del viaggio.
      * La descrizione è opzionale, quindi non influenza la validazione del form.
      */
@@ -148,8 +147,6 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
     /**
      * Salva un nuovo viaggio nel database.
      * Converte i dati dal form in un oggetto Trip e lo inserisce tramite il repository.
-     *
-     * ⭐ AGGIORNAMENTO: Ora salva "description" invece di "notes"
      */
     fun saveTrip() {
         val currentState = _tripDetailsUiState.value
@@ -169,7 +166,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
                     endDate = dateFormatter.parse(currentState.endDate) ?: Date(),
                     tripType = currentState.tripType,
                     status = "Pianificato", // Stato iniziale
-                    description = currentState.description // ⭐ description invece di notes
+                    description = currentState.description
                 )
                 repository.insertTrip(trip)
 
@@ -204,13 +201,13 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    // === ⭐ OPERAZIONI SULLE NOTE (NUOVE) ===
+    // === OPERAZIONI SULLE NOTE ===
 
     /**
      * Ottiene tutte le note di un viaggio specifico.
      *
      * @param tripId ID del viaggio
-     * @return Flow con la lista delle note
+     * @return Flow che emette la lista aggiornata delle note
      */
     fun getNotesForTrip(tripId: Int): Flow<List<TripNote>> {
         return repository.getNotesForTrip(tripId)
@@ -253,11 +250,94 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
+    // === ⭐ OPERAZIONI SULLE FOTO (NUOVE) ===
+
+    /**
+     * Ottiene tutte le foto di un viaggio specifico.
+     *
+     * @param tripId ID del viaggio
+     * @return Flow che emette la lista aggiornata delle foto
+     */
+    fun getPhotosForTrip(tripId: Int): Flow<List<TripPhoto>> {
+        return repository.getPhotosForTrip(tripId)
+    }
+
+    /**
+     * Ottiene le ultime 3 foto di un viaggio.
+     * Utile per mostrare un'anteprima durante il tracking.
+     *
+     * @param tripId ID del viaggio
+     * @return Flow con le ultime 3 foto
+     */
+    fun getRecentPhotosForTrip(tripId: Int): Flow<List<TripPhoto>> {
+        return repository.getRecentPhotosForTrip(tripId, limit = 3)
+    }
+
+    /**
+     * Ottiene tutte le foto con coordinate GPS di un viaggio.
+     * Utile per visualizzarle su una mappa.
+     *
+     * @param tripId ID del viaggio
+     * @return Flow con le foto che hanno coordinate valide
+     */
+    fun getPhotosWithLocation(tripId: Int): Flow<List<TripPhoto>> {
+        return repository.getPhotosWithLocation(tripId)
+    }
+
+    /**
+     * Inserisce una nuova foto nel database.
+     *
+     * @param photo Foto da inserire
+     */
+    fun insertPhoto(photo: TripPhoto) {
+        viewModelScope.launch {
+            try {
+                repository.insertPhoto(photo)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /**
+     * Aggiorna una foto esistente.
+     * Utile per modificare la didascalia.
+     *
+     * @param photo Foto con i dati aggiornati
+     */
+    fun updatePhoto(photo: TripPhoto) {
+        viewModelScope.launch {
+            repository.updatePhoto(photo)
+        }
+    }
+
+    /**
+     * Cancella una foto dal database.
+     * NOTA: Non elimina il file fisico, solo il record dal database.
+     *
+     * @param photo Foto da cancellare
+     */
+    fun deletePhoto(photo: TripPhoto) {
+        viewModelScope.launch {
+            repository.deletePhoto(photo)
+        }
+    }
+
+    /**
+     * Ottiene il numero di foto per un viaggio.
+     *
+     * @param tripId ID del viaggio
+     * @return Numero di foto
+     */
+    suspend fun getPhotosCount(tripId: Int): Int {
+        return repository.getPhotosCount(tripId)
+    }
+
     // === VALIDAZIONE INPUT ===
 
     /**
      * Valida che tutti i campi obbligatori siano compilati.
-     * ⭐ NOTA: La descrizione NON è obbligatoria, quindi non fa parte della validazione
+     * NOTA: La descrizione NON è obbligatoria, quindi non fa parte della validazione
      */
     private fun validateInput(
         destination: String,
@@ -294,8 +374,6 @@ data class TripUiState(
 
 /**
  * Stato dei dettagli del viaggio in inserimento/modifica.
- *
- * ⭐ AGGIORNAMENTO: Campo "notes" rinominato in "description"
  */
 data class TripDetailsUiState(
     val destination: String = "",
@@ -304,6 +382,6 @@ data class TripDetailsUiState(
     val startDate: String = "",
     val endDate: String = "",
     val tripType: String = "",
-    val description: String = "", // ⭐ Rinominato da "notes"
+    val description: String = "",
     val isEntryValid: Boolean = false
 )

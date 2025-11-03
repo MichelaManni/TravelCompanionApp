@@ -355,6 +355,17 @@ fun TripTrackingScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+        // Sezione Foto
+            selectedTrip?.let { trip ->
+                PhotoCaptureSection(
+                    tripId = trip.id,
+                    currentLocation = currentLocation,
+                    viewModel = viewModel
+                )
+            }
+
             // Google Map
             Box(
                 modifier = Modifier

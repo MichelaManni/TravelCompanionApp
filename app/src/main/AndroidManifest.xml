@@ -1,13 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permessi esistenti -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+
+    <!-- ⭐ NUOVI PERMESSI PER LA CAMERA -->
+    <!-- Permesso per usare la fotocamera -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <application
-        android:name="com.example.travelcompanionapp.TravelCompanionApplication"  android:allowBackup="true"
+        android:name="com.example.travelcompanionapp.TravelCompanionApplication"
+        android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -15,11 +24,28 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.TravelCompanionApp">
+
+        <!-- API Key per Google Maps -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCcpWT4HN5fkscIu-exDA1I4nw7ymEqB3I" />
+
+        <!-- ⭐ FILE PROVIDER PER CONDIVIDERE FILE FOTO -->
+        <!-- Il FileProvider permette all'app di condividere file in modo sicuro
+             con altre app (come la fotocamera) usando URI invece di percorsi diretti -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <activity
-            android:name="com.example.travelcompanionapp.MainActivity"  android:exported="true"
+            android:name="com.example.travelcompanionapp.MainActivity"
+            android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.TravelCompanionApp">
             <intent-filter>

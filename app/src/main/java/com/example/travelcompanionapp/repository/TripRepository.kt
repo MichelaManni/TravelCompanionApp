@@ -4,19 +4,22 @@ import com.example.travelcompanionapp.data.Trip
 import com.example.travelcompanionapp.data.TripDao
 import com.example.travelcompanionapp.data.TripNote
 import com.example.travelcompanionapp.data.TripNoteDao
+import com.example.travelcompanionapp.data.TripPhoto
+import com.example.travelcompanionapp.data.TripPhotoDao
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Repository per gestire le operazioni sui dati dei viaggi e delle note.
+ * Repository per gestire le operazioni sui dati dei viaggi, note e foto.
  *
- * ⭐ AGGIORNAMENTO: Aggiunta gestione delle note durante il viaggio
+ * ⭐ AGGIORNAMENTO: Aggiunta gestione delle foto durante il viaggio
  *
  * Il Repository astrae la sorgente dei dati (in questo caso Room Database)
  * e fornisce un'interfaccia pulita per il ViewModel.
  */
 class TripRepository(
     private val tripDao: TripDao,
-    private val tripNoteDao: TripNoteDao // ⭐ Nuovo DAO per le note
+    private val tripNoteDao: TripNoteDao,
+    private val tripPhotoDao: TripPhotoDao // ⭐ Nuovo DAO per le foto
 ) {
 
     // ============================================
@@ -52,7 +55,7 @@ class TripRepository(
 
     /**
      * Cancella un viaggio dal database.
-     * Le note associate verranno cancellate automaticamente (CASCADE).
+     * Le note e foto associate verranno cancellate automaticamente (CASCADE).
      */
     suspend fun deleteTrip(trip: Trip) {
         tripDao.delete(trip)
@@ -66,7 +69,7 @@ class TripRepository(
     }
 
     // ============================================
-    // ⭐ OPERAZIONI SULLE NOTE (TripNote)
+    // OPERAZIONI SULLE NOTE (TripNote)
     // ============================================
 
     /**
@@ -148,5 +151,104 @@ class TripRepository(
      */
     suspend fun deleteAllNotesForTrip(tripId: Int) {
         tripNoteDao.deleteAllNotesForTrip(tripId)
+    }
+
+    // ============================================
+    // ⭐ OPERAZIONI SULLE FOTO (TripPhoto)
+    // ============================================
+
+    /**
+     * Ottiene tutte le foto di un viaggio specifico.
+     * Le foto sono ordinate dalla più recente alla più vecchia.
+     *
+     * @param tripId ID del viaggio
+     * @return Flow che emette la lista aggiornata delle foto
+     */
+    fun getPhotosForTrip(tripId: Int): Flow<List<TripPhoto>> {
+        return tripPhotoDao.getPhotosForTrip(tripId)
+    }
+
+    /**
+     * Ottiene le ultime N foto di un viaggio.
+     * Utile per mostrare un'anteprima durante il tracking.
+     *
+     * @param tripId ID del viaggio
+     * @param limit Numero massimo di foto (default: 3)
+     * @return Flow con le ultime foto
+     */
+    fun getRecentPhotosForTrip(tripId: Int, limit: Int = 3): Flow<List<TripPhoto>> {
+        return tripPhotoDao.getRecentPhotosForTrip(tripId, limit)
+    }
+
+    /**
+     * Ottiene tutte le foto con coordinate GPS di un viaggio.
+     * Utile per visualizzarle su una mappa.
+     *
+     * @param tripId ID del viaggio
+     * @return Flow con le foto che hanno coordinate valide
+     */
+    fun getPhotosWithLocation(tripId: Int): Flow<List<TripPhoto>> {
+        return tripPhotoDao.getPhotosWithLocation(tripId)
+    }
+
+    /**
+     * Inserisce una nuova foto nel database.
+     *
+     * @param photo Foto da inserire
+     * @return L'ID della foto appena inserita
+     */
+    suspend fun insertPhoto(photo: TripPhoto): Long {
+        return tripPhotoDao.insert(photo)
+    }
+
+    /**
+     * Aggiorna una foto esistente.
+     * Utile per modificare la didascalia.
+     *
+     * @param photo Foto con i dati aggiornati
+     */
+    suspend fun updatePhoto(photo: TripPhoto) {
+        tripPhotoDao.update(photo)
+    }
+
+    /**
+     * Cancella una foto dal database.
+     * NOTA: Non elimina il file fisico, solo il record dal database.
+     *
+     * @param photo Foto da cancellare
+     */
+    suspend fun deletePhoto(photo: TripPhoto) {
+        tripPhotoDao.delete(photo)
+    }
+
+    /**
+     * Ottiene il numero di foto per un viaggio.
+     * Utile per mostrare badge nella lista viaggi (es: "📷 12").
+     *
+     * @param tripId ID del viaggio
+     * @return Numero di foto
+     */
+    suspend fun getPhotosCount(tripId: Int): Int {
+        return tripPhotoDao.getPhotosCount(tripId)
+    }
+
+    /**
+     * Ottiene una singola foto tramite ID.
+     *
+     * @param photoId ID della foto
+     * @return La foto cercata o null se non esiste
+     */
+    suspend fun getPhotoById(photoId: Int): TripPhoto? {
+        return tripPhotoDao.getPhotoById(photoId)
+    }
+
+    /**
+     * Cancella tutte le foto di un viaggio specifico.
+     * NOTA: Non elimina i file fisici, solo i record dal database.
+     *
+     * @param tripId ID del viaggio
+     */
+    suspend fun deleteAllPhotosForTrip(tripId: Int) {
+        tripPhotoDao.deleteAllPhotosForTrip(tripId)
     }
 }

@@ -13,26 +13,26 @@ import java.util.Date
 /**
  * La classe del database principale dell'applicazione, che estende RoomDatabase.
  *
- * ⭐ AGGIORNAMENTO VERSIONE 3 -> 4:
- * - Rinominato campo "notes" → "description" nella tabella trips
- * - Aggiunta nuova tabella "trip_notes" per le note durante il viaggio
- * - Implementate migrazioni per preservare i dati esistenti
+ * ⭐ AGGIORNAMENTO VERSIONE 4 -> 5:
+ * - Aggiunta nuova tabella "trip_photos" per le foto durante il viaggio
  *
  * STORICO VERSIONI:
  * - v1: Versione iniziale
  * - v2: Aggiunte coordinate GPS
  * - v3: Aggiunto campo notes
  * - v4: Sistema note durante viaggio (notes→description + TripNote)
+ * - v5: Sistema foto durante viaggio (TripPhoto)
  */
 @Database(
-    entities = [Trip::class, TripNote::class], // ⭐ Aggiunta TripNote
-    version = 4, // ⭐ INCREMENTATA DA 3 A 4
+    entities = [Trip::class, TripNote::class, TripPhoto::class], // ⭐ Aggiunta TripPhoto
+    version = 5, // ⭐ INCREMENTATA DA 4 A 5
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun tripDao(): TripDao
-    abstract fun tripNoteDao(): TripNoteDao // ⭐ Nuovo DAO per le note
+    abstract fun tripNoteDao(): TripNoteDao
+    abstract fun tripPhotoDao(): TripPhotoDao // ⭐ Nuovo DAO per le foto
 
     companion object {
         @Volatile
@@ -48,7 +48,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // === ⭐ MIGRAZIONE DA VERSIONE 3 A VERSIONE 4 ===
+        // === MIGRAZIONE DA VERSIONE 3 A VERSIONE 4 ===
         // Questa migrazione:
         // 1. Rinomina "notes" in "description" nella tabella trips
         // 2. Crea la nuova tabella "trip_notes" per le note durante il viaggio
@@ -114,6 +114,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // === ⭐ MIGRAZIONE DA VERSIONE 4 A VERSIONE 5 ===
+        // Questa migrazione:
+        // 1. Crea la nuova tabella "trip_photos" per le foto durante il viaggio
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // PASSO 1: Creare la nuova tabella trip_photos
+                database.execSQL("""
+                    CREATE TABLE trip_photos (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        tripId INTEGER NOT NULL,
+                        filePath TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        caption TEXT,
+                        latitude REAL,
+                        longitude REAL,
+                        locationName TEXT,
+                        FOREIGN KEY(tripId) REFERENCES trips(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+
+                // PASSO 2: Creare indice per velocizzare le query su tripId
+                database.execSQL("""
+                    CREATE INDEX index_trip_photos_tripId ON trip_photos(tripId)
+                """.trimIndent())
+            }
+        }
+
         /**
          * Funzione per ottenere l'unica istanza del database (Singleton Pattern).
          * Se l'istanza è null, la crea; altrimenti restituisce quella esistente.
@@ -125,7 +152,11 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "trip_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4) // ⭐ Aggiunte entrambe le migrazioni
+                    .addMigrations(
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5 // ⭐ Aggiunta nuova migrazione
+                    )
                     .build()
                     .also { Instance = it }
             }

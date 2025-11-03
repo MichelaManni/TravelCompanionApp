@@ -53,7 +53,6 @@ dependencies {
 
     // === GOOGLE PLAY SERVICES === //
     implementation("com.google.android.gms:play-services-location:21.0.1")
-    // ⭐ AGGIUNTO: Google Maps per Compose
     implementation("com.google.maps.android:maps-compose:4.3.3")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
 
@@ -76,9 +75,6 @@ dependencies {
     val navVersion = "2.7.7"
     implementation("androidx.navigation:navigation-compose:$navVersion")
 
-    // === RIMOZIONE OSMDROID === //
-    // Rimosso: implementation("org.osmdroid:osmdroid-android:6.1.18")
-
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
 
     // === ROOM DATABASE === //
@@ -89,6 +85,13 @@ dependencies {
 
     // === COROUTINES ===
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+
+    // === ⭐ GESTIONE FOTO ===
+    // ExifInterface per leggere i metadati delle immagini (orientamento, GPS, ecc.)
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
+    // Coil per il caricamento efficiente delle immagini (opzionale ma consigliato)
+    // implementation("io.coil-kt:coil-compose:2.5.0")
 
     // === TESTING === //
     testImplementation(libs.junit)

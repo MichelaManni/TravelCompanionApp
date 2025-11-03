@@ -10,18 +10,19 @@ import com.example.travelcompanionapp.repository.TripRepository
  * Viene eseguita prima di qualsiasi Activity o Service ed è il posto ideale
  * per inizializzare componenti che devono vivere per l'intera vita dell'app (es. Database Singleton).
  *
- * ⭐ AGGIORNAMENTO: Il repository ora include anche il TripNoteDao
+ * ⭐ AGGIORNAMENTO: Il repository ora include anche il TripPhotoDao
  */
 class TravelCompanionApplication : Application() {
 
     // Inizializzazione lazy del database Singleton usando il contesto dell'app
     private val database by lazy { AppDatabase.getDatabase(this) }
 
-    // ⭐ AGGIORNATO: Il repository ora riceve ENTRAMBI i DAO (Trip e TripNote)
+    // ⭐ AGGIORNATO: Il repository ora riceve TRE DAO (Trip, TripNote, TripPhoto)
     val repository by lazy {
         TripRepository(
             tripDao = database.tripDao(),
-            tripNoteDao = database.tripNoteDao() // ⭐ Aggiunto
+            tripNoteDao = database.tripNoteDao(),
+            tripPhotoDao = database.tripPhotoDao() // ⭐ Aggiunto
         )
     }
 
