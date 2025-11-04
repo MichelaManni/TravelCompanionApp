@@ -167,6 +167,13 @@ fun TripTrackingScreen(
 
         if (selectedTrip == null) return
 
+        // ⭐ AGGIORNAMENTO STATO: Pianificato → In corso
+        selectedTrip?.let { trip ->
+            val updatedTrip = trip.copy(status = "In corso")
+            viewModel.updateTrip(updatedTrip)
+            selectedTrip = updatedTrip // Aggiorna anche lo stato locale
+        }
+
         isTracking = true
         routePoints = emptyList()
         totalDistance = 0.0
@@ -208,12 +215,9 @@ fun TripTrackingScreen(
         isTracking = false
         fusedLocationClient.removeLocationUpdates(locationCallback)
 
-        if (totalDistance < 0.1) {
-            // Mostra dialog di conferma per distanza bassa
-            // (già implementato nel vecchio codice)
-        } else {
-            saveTrip()
-        }
+        // ⭐ MODIFICA: Salva sempre il viaggio, anche con 0 km
+        // (Conforme alle specifiche: il viaggio deve essere salvato quando si ferma il logging)
+        saveTrip()
     }
 
 
