@@ -175,9 +175,11 @@ fun TravelCompanionNavHost(
             )
         }
 
-        // === 8. IMPOSTAZIONI BACKGROUND (Placeholder) ===
         composable(Destinations.BACKGROUND_SETTINGS_ROUTE) {
-            PlaceholderScreen(title = "Operazioni Avanzate")
+            DisplayChartsScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }

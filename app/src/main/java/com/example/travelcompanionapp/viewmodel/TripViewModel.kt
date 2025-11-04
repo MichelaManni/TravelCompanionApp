@@ -35,7 +35,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = TripUiState()
         )
-
+    val completedTrips: Flow<List<Trip>> = repository.completedTrips
     // === STATO DEI DETTAGLI DEL VIAGGIO (per inserimento/modifica) ===
     /**
      * MutableStateFlow che contiene i dettagli del viaggio in fase di inserimento/modifica.
