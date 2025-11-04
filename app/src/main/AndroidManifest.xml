@@ -47,12 +47,14 @@
             android:name="com.example.travelcompanionapp.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.TravelCompanionApp">
+            android:theme="@style/Theme.TravelCompanionApp"
+            android:screenOrientation="portrait">   <!-- 🔒 blocca in verticale -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
 
     </application>
 

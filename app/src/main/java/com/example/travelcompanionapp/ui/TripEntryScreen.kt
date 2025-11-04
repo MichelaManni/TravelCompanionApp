@@ -224,7 +224,7 @@ fun TripEntryForm(
                     Text(
                         "Inizia scegliendo dove vuoi andare dalla mappa",
                         fontSize = 14.sp,
-                        color = Color.DarkGray
+                        color = Color.Black
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
@@ -267,7 +267,7 @@ fun TripEntryForm(
                         Text(
                             "Destinazione",
                             fontSize = 12.sp,
-                            color = Color.DarkGray
+                            color = Color.Black
                         )
                         Text(
                             uiState.destination,
@@ -310,7 +310,7 @@ fun TripEntryForm(
                     Text(
                         "Data Inizio",
                         fontSize = 11.sp,
-                        color = Color.Gray // ✅ Etichetta grigia
+                        color = Color.Black
                     )
                     Text(
                         if (uiState.startDate.isBlank()) "Seleziona" else uiState.startDate,
@@ -342,7 +342,7 @@ fun TripEntryForm(
                     Text(
                         "Data Fine",
                         fontSize = 11.sp,
-                        color = Color.Gray // ✅ Etichetta grigia
+                        color = Color.Black
                     )
                     Text(
                         if (uiState.endDate.isBlank()) "Seleziona" else uiState.endDate,
@@ -470,7 +470,7 @@ fun TripEntryForm(
                         Text(
                             description,
                             fontSize = 13.sp,
-                            color = Color.Gray
+                            color = Color.Black
                         )
                     }
                     if (isSelected) {
