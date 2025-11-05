@@ -11,10 +11,7 @@ import android.content.Context
 import java.util.Date
 
 /**
- * La classe del database principale dell'applicazione, che estende RoomDatabase.
- *
- * ⭐ AGGIORNAMENTO VERSIONE 4 -> 5:
- * - Aggiunta nuova tabella "trip_photos" per le foto durante il viaggio
+ * Classe del database principale dell'applicazione, che estende RoomDatabase.
  *
  * STORICO VERSIONI:
  * - v1: Versione iniziale
@@ -24,8 +21,8 @@ import java.util.Date
  * - v5: Sistema foto durante viaggio (TripPhoto)
  */
 @Database(
-    entities = [Trip::class, TripNote::class, TripPhoto::class], // ⭐ Aggiunta TripPhoto
-    version = 5, // ⭐ INCREMENTATA DA 4 A 5
+    entities = [Trip::class, TripNote::class, TripPhoto::class], //
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

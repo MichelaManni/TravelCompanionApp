@@ -39,4 +39,15 @@ interface TripDao {
     // Ottiene i viaggi completati per le statistiche (Display Charts).
     @Query("SELECT * FROM trips WHERE isCompleted = 1 ORDER BY startDate DESC") // Query SQL per selezionare solo i viaggi con isCompleted = true (1 in SQLite)
     fun getCompletedTrips(): Flow<List<Trip>>// Funzione che restituisce un Flow di liste di Trip completati
+
+    /**
+     * Ottiene tutti i viaggi in modo sincrono (per uso in WorkManager).
+     *
+     * A differenza di getAllTrips() che restituisce un Flow (reattivo),
+     * questa funzione restituisce direttamente la lista dei viaggi.
+     *
+     * Usata da ReminderWorker per controllare l'ultimo viaggio.
+     */
+    @Query("SELECT * FROM trips ORDER BY startDate DESC")
+    suspend fun getAllTripsSync(): List<Trip>
 }

@@ -14,6 +14,15 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Permesso per inviare notifiche (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Permesso per rilevare attività (camminare, guidare, ecc.) -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!-- Permesso per ricevere eventi al boot (riavviare WorkManager) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name="com.example.travelcompanionapp.TravelCompanionApplication"
         android:allowBackup="true"
@@ -54,6 +63,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Receiver per Activity Recognition -->
+        <receiver
+            android:name=".receivers.ActivityRecognitionReceiver"
+            android:exported="false">
+            <!-- Questo receiver riceve eventi dall'Activity Recognition API -->
+        </receiver>
 
 
     </application>

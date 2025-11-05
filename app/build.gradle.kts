@@ -104,4 +104,10 @@ dependencies {
     // === DEBUG === //
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // WorkManager per job periodici (notifiche reminder)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Activity Recognition API per rilevare movimento
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 }
