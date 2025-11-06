@@ -32,7 +32,7 @@ import java.util.*
  * FUNZIONALITÀ IMPLEMENTATE:
  * 1. Grafico a barre: Distanza totale per mese (ultimi 12 mesi)
  * 2. Mappa: Mostra tutte le destinazioni visitate con markers
- * 3. Statistiche generali: Totale km, numero viaggi, mese più attivo
+ * 3. Statistiche generali: Totale km, numero viaggi
  *
  * Conforme alle specifiche del progetto.
  */
@@ -143,7 +143,7 @@ fun ChartsContent(
 
 /**
  * Card con statistiche generali sui viaggi completati.
- * Mostra: Totale km, Numero viaggi, Mese più attivo.
+ * Mostra: Totale km, Numero viaggi.
  */
 @Composable
 fun GeneralStatisticsCard(trips: List<Trip>) {
@@ -151,13 +151,6 @@ fun GeneralStatisticsCard(trips: List<Trip>) {
     val totalDistance = trips.sumOf { it.totalDistanceKm }
     val totalTrips = trips.size
 
-    // Mese più attivo (più viaggi completati)
-    val mostActiveMonth = trips
-        .groupBy { trip ->
-            SimpleDateFormat("MMMM yyyy", Locale.ITALIAN).format(trip.endDate)
-        }
-        .maxByOrNull { it.value.size }
-        ?.key ?: "N/A"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -208,33 +201,6 @@ fun GeneralStatisticsCard(trips: List<Trip>) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Divider(color = TravelGreen.copy(alpha = 0.3f))
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Mese più attivo
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "🏆",
-                    fontSize = 24.sp
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = "Mese più attivo",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                    Text(
-                        text = mostActiveMonth,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TravelGreen
-                    )
-                }
-            }
         }
     }
 }
