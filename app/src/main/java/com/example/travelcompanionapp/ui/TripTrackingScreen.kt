@@ -67,6 +67,9 @@ fun TripTrackingScreen(
     var selectedTrip by remember { mutableStateOf<Trip?>(null) }
     var isTracking by remember { mutableStateOf(false) }
     var currentLocation by remember { mutableStateOf<Location?>(null) }
+    var trackingStartTime by remember { mutableStateOf<Long?>(null) }
+    var showStopDialog by remember { mutableStateOf(false) }
+    var showQuickTripDialog by remember { mutableStateOf(false) }
     var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var totalDistance by remember { mutableStateOf(0.0) }
     var elapsedTime by remember { mutableStateOf(0L) }
@@ -167,16 +170,22 @@ fun TripTrackingScreen(
 
         if (selectedTrip == null) return
 
-        // ⭐ AGGIORNAMENTO STATO: Pianificato → In corso
+        trackingStartTime = System.currentTimeMillis()
+
         selectedTrip?.let { trip ->
-            val updatedTrip = trip.copy(status = "In corso")
+            val updatedTrip = if (trip.actualStartDate == null) {
+                trip.copy(
+                    status = "In corso",
+                    actualStartDate = Date()
+                )
+            } else {
+                trip.copy(status = "In corso")
+            }
             viewModel.updateTrip(updatedTrip)
-            selectedTrip = updatedTrip // Aggiorna anche lo stato locale
+            selectedTrip = updatedTrip
         }
 
         isTracking = true
-        routePoints = emptyList()
-        totalDistance = 0.0
         elapsedTime = 0L
 
         val locationRequest = LocationRequest.Builder(
@@ -191,33 +200,52 @@ fun TripTrackingScreen(
                 null
             )
         } catch (e: SecurityException) {
-            // Gestisci l'eccezione
         }
     }
 
-    fun saveTrip() {
+    fun saveTrip(completeTrip: Boolean = true) {
         selectedTrip?.let { trip ->
-            val updatedTrip = trip.copy(
-                totalDistanceKm = totalDistance,
-                status = "Completato",
-                isCompleted = true
-            )
+            val trackingEndTime = System.currentTimeMillis()
+            val sessionDuration = trackingStartTime?.let {
+                trackingEndTime - it
+            } ?: 0L
+            val newTotalDuration = trip.totalTrackingDurationMs + sessionDuration
+
+            val updatedTrip = if (completeTrip) {
+                trip.copy(
+                    totalDistanceKm = totalDistance,
+                    status = "Completato",
+                    isCompleted = true,
+                    actualEndDate = Date(),
+                    totalTrackingDurationMs = newTotalDuration
+                )
+            } else {
+                trip.copy(
+                    totalDistanceKm = totalDistance,
+                    status = "In corso",
+                    totalTrackingDurationMs = newTotalDuration
+                )
+            }
+
             viewModel.updateTrip(updatedTrip)
 
-            selectedTrip = null
-            routePoints = emptyList()
-            totalDistance = 0.0
+            if (completeTrip) {
+                selectedTrip = null
+                routePoints = emptyList()
+                totalDistance = 0.0
+            } else {
+                selectedTrip = updatedTrip
+            }
+
             elapsedTime = 0L
+            trackingStartTime = null
         }
     }
     // Funzione per fermare il tracciamento
     fun stopTracking() {
         isTracking = false
         fusedLocationClient.removeLocationUpdates(locationCallback)
-
-        // ⭐ MODIFICA: Salva sempre il viaggio, anche con 0 km
-        // (Conforme alle specifiche: il viaggio deve essere salvato quando si ferma il logging)
-        saveTrip()
+        showStopDialog = true
     }
 
 
@@ -276,7 +304,109 @@ fun TripTrackingScreen(
         composition = headerComposition,
         iterations = LottieConstants.IterateForever
     )
+    // Dialog Pausa/Completa
+    if (showStopDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showStopDialog = false
+                isTracking = true
+                if (hasLocationPermission) {
+                    val locationRequest = LocationRequest.Builder(
+                        Priority.PRIORITY_HIGH_ACCURACY, 5000
+                    ).setMinUpdateIntervalMillis(2000).build()
+                    try {
+                        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+                    } catch (e: SecurityException) {}
+                }
+            },
+            title = { Text("Ferma il tracciamento", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Cosa vuoi fare con questo viaggio?")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("• Pausa: Ferma il GPS ma potrai riprendere dopo", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text("• Completa: Chiudi definitivamente il viaggio", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        saveTrip(completeTrip = true)
+                        showStopDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Completa viaggio")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = {
+                    saveTrip(completeTrip = false)
+                    showStopDialog = false
+                }) {
+                    Icon(Icons.Default.Pause, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Metti in pausa")
+                }
+            }
+        )
+    }
 
+// Dialog Viaggio Rapido
+    if (showQuickTripDialog) {
+        var quickDestination by remember { mutableStateOf("") }
+        var quickTripType by remember { mutableStateOf("Day trip") }
+
+        AlertDialog(
+            onDismissRequest = { showQuickTripDialog = false },
+            title = { Text("Nuovo viaggio rapido", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Crea e inizia subito un viaggio con le date di oggi")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = quickDestination,
+                        onValueChange = { quickDestination = it },
+                        label = { Text("Destinazione") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Tipo di viaggio:", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Local trip", "Day trip", "Multi-day trip").forEach { type ->
+                            FilterChip(
+                                selected = quickTripType == type,
+                                onClick = { quickTripType = type },
+                                label = { Text(type.replace(" trip", ""), fontSize = 12.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            viewModel.createQuickTrip(quickDestination, quickTripType, "Viaggio rapido")
+                            delay(300)
+                            val trips = viewModel.uiState.value.tripList
+                            selectedTrip = trips.maxByOrNull { it.id }
+                            showQuickTripDialog = false
+                        }
+                    },
+                    enabled = quickDestination.isNotBlank()
+                ) { Text("Inizia ora") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQuickTripDialog = false }) { Text("Annulla") }
+            }
+        )
+    }
     Scaffold(
         containerColor = Color.White,
         topBar = {
@@ -339,7 +469,9 @@ fun TripTrackingScreen(
                         item {
                             TripSelector(
                                 trips = uiState.tripList.filter { !it.isCompleted },
-                                onTripSelected = { selectedTrip = it }
+                                viewModel = viewModel,
+                                onTripSelected = { selectedTrip = it },
+                                onCreateQuickTrip = { showQuickTripDialog = true }
                             )
                         }
                     }

@@ -210,43 +210,42 @@ fun TripListScreen(
 }
 
 /**
- * Card che rappresenta un singolo viaggio nella lista.
- * Mostra destinazione, date, tipo, stato, descrizione e NUMERO DI NOTE.
+ * ⭐ COMPONENTE AGGIORNATO: Card viaggio con date effettive
  *
- * ⭐ AGGIORNAMENTO: Badge con numero di note
+ * Modifiche:
+ * - Usa getFormattedDateRange() per mostrare date corrette
+ * - Mostra durata tracking se disponibile
+ * - Indica visivamente se le date effettive sono diverse
  */
 @Composable
 fun TripCard(
     trip: Trip,
     onClick: () -> Unit,
-    noteCount: Int = 0 // ⭐ NUOVO parametro
+    modifier: Modifier = Modifier
 ) {
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick), // Rende la card cliccabile
-        shape = RoundedCornerShape(12.dp), // Bordi arrotondati
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 4.dp // Ombra della card
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // RIGA 1: Destinazione + icona posizione
+            // RIGA 1: Destinazione
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Filled.LocationOn,
+                    imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
                     tint = TravelGreen,
                     modifier = Modifier.size(24.dp)
@@ -262,12 +261,36 @@ fun TripCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // RIGA 2: Date del viaggio
-            Text(
-                text = "${dateFormatter.format(trip.startDate)} - ${dateFormatter.format(trip.endDate)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray
-            )
+            // ⭐ RIGA 2: Date (usa funzione del modello per mostrare date corrette)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    // Date formattate (usa il metodo del Trip)
+                    Text(
+                        text = trip.getFormattedDateRange(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (trip.hasDifferentActualDates()) {
+                            Color(0xFF2E7D32) // Verde se date effettive diverse
+                        } else {
+                            Color.Gray
+                        }
+                    )
+
+                    // ⭐ NUOVO: Mostra durata tracking se viaggio completato
+                    if (trip.isCompleted && trip.totalTrackingDurationMs > 0) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "GPS attivo: ${trip.getFormattedDuration()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF4CAF50),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 

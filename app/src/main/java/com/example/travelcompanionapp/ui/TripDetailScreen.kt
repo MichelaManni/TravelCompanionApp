@@ -29,6 +29,11 @@ import com.example.travelcompanionapp.utils.PhotoHelper
 import com.example.travelcompanionapp.viewmodel.TripViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material3.Divider
 
 /**
  * Schermata di dettaglio per un viaggio specifico.
@@ -77,6 +82,7 @@ fun TripDetailScreen(
                         fontSize = 22.sp
                     )
                 },
+
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -182,7 +188,10 @@ fun TripDetailScreen(
                     }
                 }
             }
-
+            // === DATE DETTAGLIATE ===
+            item {
+                TripDatesSection(trip = trip)
+            }
             // === DESCRIZIONE (se presente) ===
             if (trip.description.isNotBlank()) {
                 item {
@@ -391,7 +400,201 @@ fun TripDetailScreen(
         )
     }
 }
+@Composable
+fun TripDatesSection(trip: Trip) {
+    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
 
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Titolo sezione
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = TravelGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "📅 Date",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Date pianificate (sempre visibili)
+            DateRow(
+                label = "Pianificato:",
+                startDate = trip.startDate,
+                endDate = trip.endDate,
+                color = Color.Gray,
+                dateFormatter = dateFormatter
+            )
+
+            // Date effettive (solo se completato)
+            if (trip.isCompleted && trip.actualStartDate != null && trip.actualEndDate != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Linea separatore
+                Divider(color = Color(0xFFE0E0E0), thickness = 1.dp)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                DateRow(
+                    label = "Effettivo:",
+                    startDate = trip.actualStartDate!!,
+                    endDate = trip.actualEndDate!!,
+                    color = TravelGreen,
+                    dateFormatter = dateFormatter,
+                    isBold = true
+                )
+
+                // Mostra durata tracking
+                if (trip.totalTrackingDurationMs > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Surface(
+                        color = Color(0xFFE8F5E9),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Timer,
+                                contentDescription = null,
+                                tint = TravelGreen,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Durata GPS attivo",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Gray
+                                )
+                                Text(
+                                    trip.getFormattedDuration(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TravelGreen
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Badge se date diverse
+                if (trip.hasDifferentActualDates()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Surface(
+                        color = Color(0xFFFFF3E0),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = Color(0xFFFF9800),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Le date effettive di tracking sono diverse da quelle pianificate",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFE65100)
+                            )
+                        }
+                    }
+                }
+            } else if (trip.status == "In corso") {
+                // Viaggio in corso ma non ancora completato
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Surface(
+                    color = Color(0xFFFFF8E1),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.DirectionsWalk,
+                            contentDescription = null,
+                            tint = Color(0xFFFFA726),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                "Viaggio in corso",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFA726)
+                            )
+                            if (trip.actualStartDate != null) {
+                                Text(
+                                    "Iniziato il ${dateFormatter.format(trip.actualStartDate)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Helper composable per mostrare una riga di date
+ */
+@Composable
+fun DateRow(
+    label: String,
+    startDate: Date,
+    endDate: Date,
+    color: Color,
+    dateFormatter: SimpleDateFormat,
+    isBold: Boolean = false
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = color,
+            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal
+        )
+        Text(
+            "${dateFormatter.format(startDate)} - ${dateFormatter.format(endDate)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = color,
+            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
 /**
  * ⭐ NUOVO: Componibile per mostrare una miniatura della foto.
  * Quando cliccata, apre la foto ingrandita.

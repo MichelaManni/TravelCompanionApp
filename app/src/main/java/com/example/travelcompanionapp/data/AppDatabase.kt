@@ -19,17 +19,18 @@ import java.util.Date
  * - v3: Aggiunto campo notes
  * - v4: Sistema note durante viaggio (notes→description + TripNote)
  * - v5: Sistema foto durante viaggio (TripPhoto)
+ * - v6: Date effettive di tracking (actualStartDate, actualEndDate, totalTrackingDurationMs)
  */
 @Database(
-    entities = [Trip::class, TripNote::class, TripPhoto::class], //
-    version = 5,
+    entities = [Trip::class, TripNote::class, TripPhoto::class],
+    version = 6, // ⭐ AGGIORNATA da 5 a 6
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun tripDao(): TripDao
     abstract fun tripNoteDao(): TripNoteDao
-    abstract fun tripPhotoDao(): TripPhotoDao // ⭐ Nuovo DAO per le foto
+    abstract fun tripPhotoDao(): TripPhotoDao
 
     companion object {
         @Volatile
@@ -111,7 +112,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // === ⭐ MIGRAZIONE DA VERSIONE 4 A VERSIONE 5 ===
+        // === MIGRAZIONE DA VERSIONE 4 A VERSIONE 5 ===
         // Questa migrazione:
         // 1. Crea la nuova tabella "trip_photos" per le foto durante il viaggio
         private val MIGRATION_4_5 = object : Migration(4, 5) {
@@ -138,6 +139,45 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // === ⭐ MIGRAZIONE DA VERSIONE 5 A VERSIONE 6 ===
+        // Questa migrazione:
+        // 1. Aggiunge campi per le date effettive di tracking GPS
+        // 2. Aggiunge campo per la durata totale del tracking
+        //
+        // MOTIVAZIONE:
+        // - startDate/endDate = date pianificate dall'utente
+        // - actualStartDate/actualEndDate = quando il GPS era effettivamente attivo
+        // - totalTrackingDurationMs = durata totale con GPS acceso
+        //
+        // Questo permette di distinguere tra:
+        // "Viaggio pianificato 10-15 Gen" vs "Effettivamente tracciato 12-13 Gen"
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // PASSO 1: Aggiunge campo per data inizio tracking effettivo
+                // NULL = viaggio non ancora tracciato
+                database.execSQL("""
+                    ALTER TABLE trips 
+                    ADD COLUMN actualStartDate INTEGER
+                """.trimIndent())
+
+                // PASSO 2: Aggiunge campo per data fine tracking effettivo
+                // NULL = viaggio non completato o in pausa
+                database.execSQL("""
+                    ALTER TABLE trips 
+                    ADD COLUMN actualEndDate INTEGER
+                """.trimIndent())
+
+                // PASSO 3: Aggiunge campo per durata totale tracking in millisecondi
+                // DEFAULT 0 = nessun tracking ancora effettuato
+                database.execSQL("""
+                    ALTER TABLE trips 
+                    ADD COLUMN totalTrackingDurationMs INTEGER NOT NULL DEFAULT 0
+                """.trimIndent())
+
+                println("✅ Migrazione 5→6: Aggiunti campi per tracking effettivo")
+            }
+        }
+
         /**
          * Funzione per ottenere l'unica istanza del database (Singleton Pattern).
          * Se l'istanza è null, la crea; altrimenti restituisce quella esistente.
@@ -152,7 +192,8 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_2_3,
                         MIGRATION_3_4,
-                        MIGRATION_4_5 // ⭐ Aggiunta nuova migrazione
+                        MIGRATION_4_5,
+                        MIGRATION_5_6  // ⭐ Aggiunta nuova migrazione
                     )
                     .build()
                     .also { Instance = it }

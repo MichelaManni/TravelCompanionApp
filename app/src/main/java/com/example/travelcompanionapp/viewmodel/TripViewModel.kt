@@ -18,8 +18,10 @@ import java.util.*
  * ViewModel per gestire lo stato dell'interfaccia utente e le operazioni sui viaggi.
  * Comunica con il Repository e fornisce i dati alle UI attraverso Flow e StateFlow.
  *
- * ⭐ AGGIORNAMENTO:
+ * ⭐ AGGIORNAMENTI:
  * - Aggiunta gestione completa delle foto
+ * - Aggiunta funzione per determinare stato temporale del viaggio
+ * - Supporto per creazione viaggio rapido
  */
 class TripViewModel(private val repository: TripRepository) : ViewModel() {
 
@@ -179,6 +181,31 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
     }
 
     /**
+     * ⭐ NUOVA: Crea e salva un viaggio rapido con date di oggi.
+     * Utile per iniziare a tracciare immediatamente senza pianificazione.
+     *
+     * @param destination Nome della destinazione
+     * @param tripType Tipo di viaggio (Local trip, Day trip, etc.)
+     * @param description Descrizione opzionale
+     */
+    suspend fun createQuickTrip(
+        destination: String,
+        tripType: String,
+        description: String = "Viaggio rapido"
+    ) {
+        val today = Date()
+        val trip = Trip(
+            destination = destination,
+            startDate = today,
+            endDate = today,
+            tripType = tripType,
+            status = "Pianificato",
+            description = description
+        )
+        repository.insertTrip(trip)
+    }
+
+    /**
      * Aggiorna un viaggio esistente nel database.
      * Usata ad esempio per salvare la distanza percorsa dopo il tracking.
      */
@@ -250,7 +277,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    // === ⭐ OPERAZIONI SULLE FOTO (NUOVE) ===
+    // === OPERAZIONI SULLE FOTO ===
 
     /**
      * Ottiene tutte le foto di un viaggio specifico.
@@ -333,6 +360,131 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         return repository.getPhotosCount(tripId)
     }
 
+    // === ⭐ GESTIONE STATO TEMPORALE DEI VIAGGI ===
+
+    /**
+     * Determina lo stato temporale di un viaggio rispetto alla data corrente.
+     *
+     * Questo metodo confronta le date pianificate del viaggio con la data odierna
+     * per stabilire se il viaggio è:
+     * - ACTIVE: in corso (oggi è tra startDate e endDate)
+     * - UPCOMING: inizia presto (entro 3 giorni)
+     * - RECENT: appena finito (terminato da massimo 3 giorni)
+     * - FUTURE: pianificato per il futuro lontano
+     * - PAST: terminato da tempo
+     *
+     * UTILITÀ:
+     * - In TripTrackingScreen per dare priorità ai viaggi rilevanti
+     * - In TripListScreen per raggruppare i viaggi per stato
+     * - Per validare se ha senso tracciare un determinato viaggio
+     *
+     * @param trip Viaggio da analizzare
+     * @return TripTemporalStatus che descrive la relazione temporale
+     */
+    fun getTripTemporalStatus(trip: Trip): TripTemporalStatus {
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.time
+
+        val startCal = Calendar.getInstance().apply {
+            time = trip.startDate
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val endCal = Calendar.getInstance().apply {
+            time = trip.endDate
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }
+
+        // Calcola differenza in giorni
+        val millisecondsInDay = 1000L * 60 * 60 * 24
+        val daysUntilStart = ((startCal.timeInMillis - today.time) / millisecondsInDay).toInt()
+        val daysSinceEnd = ((today.time - endCal.timeInMillis) / millisecondsInDay).toInt()
+
+        return when {
+            // Viaggio in corso (oggi è tra start e end)
+            today >= trip.startDate && today <= endCal.time ->
+                TripTemporalStatus.ACTIVE
+
+            // Viaggio inizia tra 0-3 giorni
+            daysUntilStart in 0..3 ->
+                TripTemporalStatus.UPCOMING
+
+            // Viaggio finito da 0-3 giorni
+            daysSinceEnd in 0..3 ->
+                TripTemporalStatus.RECENT
+
+            // Viaggio nel passato
+            today > endCal.time ->
+                TripTemporalStatus.PAST
+
+            // Viaggio nel futuro lontano
+            else ->
+                TripTemporalStatus.FUTURE
+        }
+    }
+
+    /**
+     * Calcola quanti giorni mancano all'inizio del viaggio.
+     *
+     * @param trip Viaggio da analizzare
+     * @return Numero di giorni (positivo = futuro, negativo = passato, 0 = oggi)
+     */
+    fun getDaysUntilTripStart(trip: Trip): Int {
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val startCal = Calendar.getInstance().apply {
+            time = trip.startDate
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val millisecondsInDay = 1000L * 60 * 60 * 24
+        return ((startCal.timeInMillis - today.timeInMillis) / millisecondsInDay).toInt()
+    }
+
+    /**
+     * Calcola quanti giorni sono passati dalla fine del viaggio.
+     *
+     * @param trip Viaggio da analizzare
+     * @return Numero di giorni (positivo = passato, negativo = futuro, 0 = oggi)
+     */
+    fun getDaysSinceTripEnd(trip: Trip): Int {
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val endCal = Calendar.getInstance().apply {
+            time = trip.endDate
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val millisecondsInDay = 1000L * 60 * 60 * 24
+        return ((today.timeInMillis - endCal.timeInMillis) / millisecondsInDay).toInt()
+    }
+
     // === VALIDAZIONE INPUT ===
 
     /**
@@ -362,7 +514,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
     }
 }
 
-// === DATA CLASSES PER LO STATO DELL'UI ===
+// === DATA CLASSES E ENUM PER LO STATO DELL'UI ===
 
 /**
  * Stato generale dell'applicazione (lista viaggi).
@@ -385,3 +537,28 @@ data class TripDetailsUiState(
     val description: String = "",
     val isEntryValid: Boolean = false
 )
+
+/**
+ * ⭐ NUOVO: Enum per rappresentare lo stato temporale di un viaggio.
+ *
+ * Usato per:
+ * - Prioritizzare i viaggi in TripTrackingScreen
+ * - Colorare/raggruppare i viaggi in TripListScreen
+ * - Mostrare badge di stato nell'UI
+ */
+enum class TripTemporalStatus {
+    /** Viaggio in corso (oggi è tra le date pianificate) */
+    ACTIVE,
+
+    /** Viaggio che inizia presto (entro 3 giorni) */
+    UPCOMING,
+
+    /** Viaggio appena concluso (finito da massimo 3 giorni) */
+    RECENT,
+
+    /** Viaggio pianificato per il futuro lontano */
+    FUTURE,
+
+    /** Viaggio terminato da tempo */
+    PAST
+}
