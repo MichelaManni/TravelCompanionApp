@@ -246,7 +246,7 @@ fun MapSelectionScreen(
                     myLocationButtonEnabled = false
                 ),
                 onMapClick = { latLng ->
-                    // Quando l'utente tocca sulla mappa
+                    // Quando l'utente tocca sulla mappa, aggiorniamo immediatamente
                     selectedLocation = latLng
                     isLoadingAddress = true
                     locationName = null
@@ -264,20 +264,36 @@ fun MapSelectionScreen(
                     // Creiamo uno stato per il marker che può essere trascinato
                     val markerState = rememberMarkerState(position = location)
 
-                    // Osserva i cambiamenti nella posizione del marker (quando viene trascinato)
-                    LaunchedEffect(markerState.position) {
-                        // Se la posizione del marker è diversa da quella selezionata
+                    // Aggiorna il marker state quando la location cambia (dal click sulla mappa)
+                    LaunchedEffect(location) {
                         if (markerState.position != location) {
-                            // Aggiorna la posizione selezionata
-                            selectedLocation = markerState.position
-                            isLoadingAddress = true
-                            locationName = null
-
-                            // Ottieni il nuovo indirizzo
-                            val address = getAddressFromLocation(markerState.position)
-                            locationName = address
-                            isLoadingAddress = false
+                            markerState.position = location
                         }
+                    }
+
+                    // Monitora quando il marker viene trascinato dall'utente
+                    LaunchedEffect(Unit) {
+                        snapshotFlow { markerState.position }
+                            .collect { newPosition ->
+                                // Se la posizione è diversa da quella selezionata,
+                                // significa che l'utente ha trascinato il marker
+                                if (newPosition != location) {
+                                    // Aspetta un po' per essere sicuri che il drag sia finito
+                                    kotlinx.coroutines.delay(500)
+
+                                    // Verifica che la posizione sia ancora la stessa (non sta più trascinando)
+                                    if (markerState.position == newPosition) {
+                                        selectedLocation = newPosition
+                                        isLoadingAddress = true
+                                        locationName = null
+
+                                        // Avvia la conversione coordinate → indirizzo in background
+                                        val address = getAddressFromLocation(newPosition)
+                                        locationName = address
+                                        isLoadingAddress = false
+                                    }
+                                }
+                            }
                     }
 
                     // Marker rosso trascinabile
