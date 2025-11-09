@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Logica e regole per i diversi tipi di viaggio.
  *
- * ⭐ TIPOLOGIE DI VIAGGIO E LORO SIGNIFICATO:
+ * TIPOLOGIE DI VIAGGIO E LORO SIGNIFICATO:
  *
  * 1. LOCAL TRIP (Viaggio Locale)
  *    - Durata: Massimo 1 giorno
@@ -25,27 +25,22 @@ import java.util.concurrent.TimeUnit
  */
 object TripTypeLogic {
 
-    // Costanti per i tipi di viaggio
+    //costanti testuali che rappresentano le tre principali tipologie di viaggio
     const val LOCAL_TRIP = "Local trip"
     const val DAY_TRIP = "Day trip"
     const val MULTI_DAY_TRIP = "Multi-day trip"
 
-    // Limiti di distanza (in km)
+    //limiti di distanza in chilometri per differenziare i tipi di viaggio
     const val LOCAL_TRIP_MAX_DISTANCE = 50.0
     const val DAY_TRIP_MAX_DISTANCE = 200.0
 
-    /**
-     * Valida se un viaggio rispetta le regole del suo tipo.
-     *
-     * @param trip Il viaggio da validare
-     * @return Messaggio di errore se non valido, null se tutto ok
-     */
+    //funzione che verifica se un viaggio rispetta le regole del tipo dichiarato
     fun validateTrip(trip: Trip): String? {
-        val durationDays = calculateDurationDays(trip)
+        val durationDays = calculateDurationDays(trip) //calcola la durata del viaggio in giorni
 
         return when (trip.tripType) {
             LOCAL_TRIP -> {
-                // Local trip deve essere di massimo 1 giorno
+                //un viaggio locale non deve durare più di un giorno
                 if (durationDays > 1) {
                     "⚠️ Un viaggio locale non può durare più di 1 giorno"
                 } else {
@@ -54,7 +49,7 @@ object TripTypeLogic {
             }
 
             DAY_TRIP -> {
-                // Day trip deve essere esattamente 1 giorno
+                //una gita giornaliera deve durare esattamente un giorno
                 if (durationDays != 1) {
                     "⚠️ Una gita giornaliera deve durare esattamente 1 giorno"
                 } else {
@@ -63,7 +58,7 @@ object TripTypeLogic {
             }
 
             MULTI_DAY_TRIP -> {
-                // Multi-day trip deve essere almeno 2 giorni
+                //un viaggio multi-giorno deve durare almeno due giorni
                 if (durationDays < 2) {
                     "⚠️ Un viaggio multi-giorno deve durare almeno 2 giorni"
                 } else {
@@ -71,51 +66,41 @@ object TripTypeLogic {
                 }
             }
 
-            else -> "⚠️ Tipo di viaggio non riconosciuto"
+            else -> "⚠️ Tipo di viaggio non riconosciuto" //messaggio di fallback per tipi sconosciuti
         }
     }
 
-    /**
-     * Suggerisce il tipo di viaggio appropriato in base a date e distanza.
-     *
-     * @param startDate Data inizio
-     * @param endDate Data fine
-     * @param distanceKm Distanza percorsa (opzionale)
-     * @return Tipo di viaggio suggerito
-     */
+    //funzione che suggerisce automaticamente il tipo di viaggio in base alle date e alla distanza percorsa
     fun suggestTripType(
-        startDate: java.util.Date,
-        endDate: java.util.Date,
-        distanceKm: Double = 0.0
+        startDate: java.util.Date, //data di inizio del viaggio
+        endDate: java.util.Date, //data di fine del viaggio
+        distanceKm: Double = 0.0 //distanza percorsa (opzionale)
     ): String {
+        //calcola la durata del viaggio in giorni interi
         val durationDays = TimeUnit.MILLISECONDS.toDays(
             endDate.time - startDate.time
         ).toInt() + 1
 
         return when {
-            // Se è più di un giorno, sicuramente multi-day
+            //se dura più di un giorno viene classificato automaticamente come multi-day trip
             durationDays > 1 -> MULTI_DAY_TRIP
 
-            // Se è 1 giorno e distanza < 50km, è local trip
+            //se dura un giorno solo e la distanza è inferiore a 50 km è un local trip
             durationDays == 1 && distanceKm < LOCAL_TRIP_MAX_DISTANCE -> LOCAL_TRIP
 
-            // Altrimenti day trip
+            //altrimenti viene considerato day trip
             else -> DAY_TRIP
         }
     }
 
-    /**
-     * Calcola la durata in giorni di un viaggio.
-     */
+    //funzione che calcola la durata del viaggio in giorni
     fun calculateDurationDays(trip: Trip): Int {
         return TimeUnit.MILLISECONDS.toDays(
             trip.endDate.time - trip.startDate.time
-        ).toInt() + 1
+        ).toInt() + 1 //aggiunge 1 per includere il giorno iniziale
     }
 
-    /**
-     * Restituisce una descrizione del tipo di viaggio.
-     */
+    //funzione che restituisce una descrizione testuale del tipo di viaggio
     fun getTripTypeDescription(tripType: String): String {
         return when (tripType) {
             LOCAL_TRIP -> "Viaggio nella tua zona (max 1 giorno, < 50 km)"
@@ -125,9 +110,7 @@ object TripTypeLogic {
         }
     }
 
-    /**
-     * Restituisce l'emoji appropriata per il tipo di viaggio.
-     */
+    //funzione che restituisce un’emoji corrispondente al tipo di viaggio per uso visivo nell’interfaccia
     fun getTripTypeEmoji(tripType: String): String {
         return when (tripType) {
             LOCAL_TRIP -> "🏙️"
@@ -137,121 +120,4 @@ object TripTypeLogic {
         }
     }
 
-    /**
-     * Controlla se la distanza è appropriata per il tipo di viaggio.
-     * Restituisce un avviso se la distanza sembra anomala.
-     */
-    fun checkDistanceWarning(trip: Trip): String? {
-        if (trip.totalDistanceKm == 0.0) return null
-
-        return when (trip.tripType) {
-            LOCAL_TRIP -> {
-                if (trip.totalDistanceKm > LOCAL_TRIP_MAX_DISTANCE) {
-                    "💡 Hai percorso più di 50 km. Forse era una 'Gita giornaliera'?"
-                } else {
-                    null
-                }
-            }
-
-            DAY_TRIP -> {
-                when {
-                    trip.totalDistanceKm < LOCAL_TRIP_MAX_DISTANCE -> {
-                        "💡 Meno di 50 km. Forse era un 'Viaggio locale'?"
-                    }
-                    trip.totalDistanceKm > DAY_TRIP_MAX_DISTANCE -> {
-                        "💡 Più di 200 km in un giorno. Ottimo viaggio!"
-                    }
-                    else -> null
-                }
-            }
-
-            else -> null
-        }
-    }
-
-    /**
-     * Restituisce statistiche e badge in base al tipo e performance del viaggio.
-     */
-    fun getTripBadges(trip: Trip): List<String> {
-        val badges = mutableListOf<String>()
-        val durationDays = calculateDurationDays(trip)
-
-        // Badge per distanza
-        when {
-            trip.totalDistanceKm > 1000 -> badges.add("🏆 Esploratore Instancabile")
-            trip.totalDistanceKm > 500 -> badges.add("⭐ Grande Viaggiatore")
-            trip.totalDistanceKm > 200 -> badges.add("✨ Avventuriero")
-        }
-
-        // Badge per durata
-        when {
-            durationDays > 30 -> badges.add("🌍 Nomade Digitale")
-            durationDays > 14 -> badges.add("🎒 Vagabondo")
-            durationDays > 7 -> badges.add("⛺ Esploratore")
-        }
-
-        // Badge per tipo specifico
-        when (trip.tripType) {
-            LOCAL_TRIP -> {
-                if (trip.totalDistanceKm > 30) {
-                    badges.add("🚶 Camminatore Urbano")
-                }
-            }
-            DAY_TRIP -> {
-                if (trip.totalDistanceKm > 150) {
-                    badges.add("🚗 Re della Strada")
-                }
-            }
-            MULTI_DAY_TRIP -> {
-                val avgDistancePerDay = trip.totalDistanceKm / durationDays
-                if (avgDistancePerDay > 100) {
-                    badges.add("⚡ Velocista")
-                }
-            }
-        }
-
-        return badges
-    }
-
-    /**
-     * Calcola suggerimenti in base al tipo di viaggio e alle performance.
-     */
-    fun getTripSuggestions(trip: Trip): List<String> {
-        val suggestions = mutableListOf<String>()
-        val durationDays = calculateDurationDays(trip)
-
-        when (trip.tripType) {
-            LOCAL_TRIP -> {
-                suggestions.add("💡 Perfetto per esplorare la tua città!")
-                if (trip.totalDistanceKm < 10) {
-                    suggestions.add("🚶 Considera di camminare di più per scoprire angoli nascosti")
-                }
-            }
-
-            DAY_TRIP -> {
-                suggestions.add("🗓️ Ideale per una giornata di esplorazione!")
-                if (trip.totalDistanceKm < 50) {
-                    suggestions.add("🚗 Prova a visitare località più lontane la prossima volta")
-                }
-            }
-
-            MULTI_DAY_TRIP -> {
-                val avgDistancePerDay = if (durationDays > 0) {
-                    trip.totalDistanceKm / durationDays
-                } else {
-                    0.0
-                }
-
-                suggestions.add("✈️ Grande avventura di $durationDays giorni!")
-
-                if (avgDistancePerDay < 50) {
-                    suggestions.add("🏖️ Sembra un viaggio rilassante. Perfetto!")
-                } else if (avgDistancePerDay > 150) {
-                    suggestions.add("⚡ Wow! Hai macinato km ogni giorno!")
-                }
-            }
-        }
-
-        return suggestions
-    }
 }

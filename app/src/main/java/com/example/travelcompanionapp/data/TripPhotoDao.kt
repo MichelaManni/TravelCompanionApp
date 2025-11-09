@@ -17,90 +17,49 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TripPhotoDao {
 
-    /**
-     * Ottiene tutte le foto di un viaggio specifico.
-     * Le foto sono ordinate dalla più recente alla più vecchia (timestamp DESC).
-     *
-     * @param tripId ID del viaggio
-     * @return Flow che emette la lista aggiornata delle foto
-     */
+
+     //Ottiene tutte le foto di un viaggio specifico.
+     //Le foto sono ordinate dalla più recente alla più vecchia (timestamp DESC).
     @Query("SELECT * FROM trip_photos WHERE tripId = :tripId ORDER BY timestamp DESC")
     fun getPhotosForTrip(tripId: Int): Flow<List<TripPhoto>>
 
-    /**
-     * Ottiene una singola foto tramite ID.
-     *
-     * @param photoId ID della foto
-     * @return La foto cercata o null se non esiste
-     */
+
+     //Ottiene una singola foto tramite ID.
     @Query("SELECT * FROM trip_photos WHERE id = :photoId")
     suspend fun getPhotoById(photoId: Int): TripPhoto?
 
-    /**
-     * Inserisce una nuova foto nel database.
-     *
-     * @param photo Foto da inserire
-     * @return L'ID della foto appena inserita
-     */
+
+     // Inserisce una nuova foto nel database.
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(photo: TripPhoto): Long
 
-    /**
-     * Aggiorna una foto esistente.
-     * Utile per modificare la didascalia dopo lo scatto.
-     *
-     * @param photo Foto con i dati aggiornati
-     */
+    // Aggiorna una foto esistente.
     @Update
     suspend fun update(photo: TripPhoto)
 
-    /**
-     * Cancella una foto dal database.
-     * NOTA: Questo cancella solo il record dal database, non il file fisico.
-     * Il file deve essere eliminato separatamente dal file system.
-     *
-     * @param photo Foto da cancellare
-     */
+
+     //Cancella una foto dal database.
+     //NOTA: Questo cancella solo il record dal database, non il file fisico.
     @Delete
     suspend fun delete(photo: TripPhoto)
 
-    /**
-     * Cancella tutte le foto di un viaggio specifico.
-     * Utile per pulizia dati o test.
-     *
-     * @param tripId ID del viaggio
-     */
+    // Cancella tutte le foto di un viaggio specifico.
     @Query("DELETE FROM trip_photos WHERE tripId = :tripId")
     suspend fun deleteAllPhotosForTrip(tripId: Int)
 
-    /**
-     * Conta il numero di foto per un viaggio.
-     * Utile per mostrare badge nella lista viaggi.
-     *
-     * @param tripId ID del viaggio
-     * @return Numero di foto
-     */
+     //Conta il numero di foto per un viaggio.
+     //Utile per mostrare badge nella lista viaggi.
     @Query("SELECT COUNT(*) FROM trip_photos WHERE tripId = :tripId")
     suspend fun getPhotosCount(tripId: Int): Int
 
-    /**
-     * Ottiene le ultime N foto di un viaggio.
-     * Utile per mostrare un'anteprima durante il tracking.
-     *
-     * @param tripId ID del viaggio
-     * @param limit Numero massimo di foto da restituire
-     * @return Flow con le ultime foto
-     */
+
+     // Ottiene le ultime N foto di un viaggio.
+     //Utile per mostrare un'anteprima durante il tracking.
     @Query("SELECT * FROM trip_photos WHERE tripId = :tripId ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentPhotosForTrip(tripId: Int, limit: Int = 3): Flow<List<TripPhoto>>
 
-    /**
-     * Ottiene tutte le foto con coordinate GPS.
-     * Utile per visualizzarle su una mappa.
-     *
-     * @param tripId ID del viaggio
-     * @return Flow con le foto che hanno coordinate valide
-     */
+    //Ottiene tutte le foto con coordinate GPS.
+     //Utile per visualizzarle su una mappa.
     @Query("SELECT * FROM trip_photos WHERE tripId = :tripId AND latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY timestamp DESC")
     fun getPhotosWithLocation(tripId: Int): Flow<List<TripPhoto>>
 }

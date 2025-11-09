@@ -4,10 +4,6 @@
 
     Questo file definisce quali directory dell'app possono essere condivise
     con altre applicazioni (come la fotocamera) in modo sicuro.
-
-    ⭐ PER STUDENTI:
-    Il FileProvider è necessario a partire da Android 7.0 (API 24) per motivi di sicurezza.
-    Non possiamo più passare percorsi diretti (file://) ad altre app, ma dobbiamo usare URI (content://).
 -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
 

@@ -30,62 +30,53 @@ import java.util.*
 /**
  * Schermata principale per visualizzare la lista dei viaggi salvati.
  * Mostra tutti i viaggi con possibilità di filtro per tipo.
- *
- * ⭐ AGGIORNAMENTO: Ora visualizza anche le note dei viaggi
  */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripListScreen(
-    viewModel: TripViewModel, // ViewModel per accedere ai dati
-    onNavigateBack: () -> Unit, // Funzione per tornare indietro
-    onTripClick: (Trip) -> Unit, // Funzione chiamata quando clicchi su un viaggio
-    modifier: Modifier = Modifier
+    viewModel: TripViewModel, //viewmodel che gestisce i dati dei viaggi e lo stato della lista
+    onNavigateBack: () -> Unit, //funzione di callback per tornare alla schermata precedente
+    onTripClick: (Trip) -> Unit, //callback che riceve il viaggio cliccato per aprire i dettagli
+    modifier: Modifier = Modifier //modifier esterno per padding o estensioni grafiche
 ) {
-    // Collezioniamo lo stato dal ViewModel (contiene la lista viaggi)
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsState() //osserva lo stato ui del viewmodel e ricompone la schermata quando cambia
 
-    // Stato locale per il filtro selezionato (null = mostra tutti)
-    var selectedFilter by remember { mutableStateOf<String?>(null) }
+    var selectedFilter by remember { mutableStateOf<String?>(null) } //mantiene il tipo di viaggio filtrato (null mostra tutti)
+    var showFilterMenu by remember { mutableStateOf(false) } //gestisce la visibilità del menu a tendina dei filtri
 
-    // Stato per mostrare/nascondere il menu filtri
-    var showFilterMenu by remember { mutableStateOf(false) }
-
-    // Lottie Animation per il titolo (stessa usata nel menu)
-    val headerComposition by rememberLottieComposition(
+    val headerComposition by rememberLottieComposition( //carica la composizione lottie per l’animazione del titolo
         LottieCompositionSpec.RawRes(R.raw.miei_viaggi_menu)
     )
-    val headerProgress by animateLottieCompositionAsState(
+    val headerProgress by animateLottieCompositionAsState( //gestisce lo stato di animazione continuo del titolo
         composition = headerComposition,
         iterations = LottieConstants.IterateForever
     )
 
-    // Filtriamo la lista viaggi in base al tipo selezionato
+    //applica il filtro in base al tipo di viaggio selezionato
     val filteredTrips = if (selectedFilter == null) {
-        // Se nessun filtro, mostra tutti i viaggi
-        uiState.tripList
+        uiState.tripList //se nessun filtro attivo, mostra tutti i viaggi
     } else {
-        // Altrimenti mostra solo i viaggi del tipo selezionato
-        uiState.tripList.filter { it.tripType == selectedFilter }
+        uiState.tripList.filter { it.tripType == selectedFilter } //altrimenti mostra solo quelli con il tipo selezionato
     }
 
     Scaffold(
-        containerColor = Color.White, // Sfondo bianco
+        containerColor = Color.White, //sfondo generale bianco
         topBar = {
-            CenterAlignedTopAppBar(
+            CenterAlignedTopAppBar( //barra superiore centrata
                 title = {
-                    // Titolo con animazione Lottie
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                    Row( //riga che contiene animazione e testo
+                        verticalAlignment = Alignment.CenterVertically, //centra verticalmente gli elementi
+                        horizontalArrangement = Arrangement.Center //centra orizzontalmente
                     ) {
-                        LottieAnimation(
+                        LottieAnimation( //riproduce l’animazione lottie come icona titolo
                             composition = headerComposition,
                             progress = headerProgress,
                             modifier = Modifier.size(40.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(8.dp)) //spazio tra icona e testo
                         Text(
-                            "I Miei Viaggi",
+                            "I Miei Viaggi", //titolo della schermata
                             color = TravelGreen,
                             fontWeight = FontWeight.Bold,
                             fontSize = 22.sp
@@ -93,21 +84,19 @@ fun TripListScreen(
                     }
                 },
                 navigationIcon = {
-                    // Pulsante per tornare indietro
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = onNavigateBack) { //bottone per tornare alla schermata precedente
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Torna Indietro",
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack, //icona freccia indietro
+                            contentDescription = "Torna Indietro", //descrizione per accessibilità
                             tint = Color.Black
                         )
                     }
                 },
                 actions = {
-                    // Pulsante per aprire i filtri
-                    IconButton(onClick = { showFilterMenu = true }) {
+                    IconButton(onClick = { showFilterMenu = true }) { //bottone per aprire il menu dei filtri
                         Icon(
-                            imageVector = Icons.Filled.FilterList,
-                            contentDescription = "Filtri",
+                            imageVector = Icons.Filled.FilterList, //icona filtro
+                            contentDescription = "Filtri", //descrizione accessibilità
                             tint = TravelGreen
                         )
                     }
@@ -120,88 +109,78 @@ fun TripListScreen(
     ) { paddingValues ->
         Column(
             modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+                .fillMaxSize() //occupa tutta l’altezza disponibile
+                .padding(paddingValues) //rispetta i padding forniti dallo scaffold
         ) {
-            // Chip per mostrare il filtro attivo
-            if (selectedFilter != null) {
+            if (selectedFilter != null) { //se esiste un filtro attivo
                 Surface(
-                    color = TravelGreen.copy(alpha = 0.1f),
+                    color = TravelGreen.copy(alpha = 0.1f), //sfondo leggero per distinguere il chip filtro
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth() //larghezza piena
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.SpaceBetween, //testo a sinistra e bottone a destra
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Filtro: $selectedFilter",
+                            text = "Filtro: $selectedFilter", //mostra tipo di viaggio filtrato
                             color = TravelGreen,
                             fontWeight = FontWeight.Medium
                         )
-                        // Pulsante per rimuovere il filtro
-                        TextButton(onClick = { selectedFilter = null }) {
+                        TextButton(onClick = { selectedFilter = null }) { //bottone per rimuovere il filtro
                             Text("Rimuovi", color = TravelGreen)
                         }
                     }
                 }
             }
 
-            // Contenuto principale: lista viaggi o messaggio vuoto
-            if (uiState.isLoading) {
-                // Mostra loading mentre carica i dati
+            if (uiState.isLoading) { //mostra caricamento se i dati non sono ancora pronti
                 Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center //centra il loader
                 ) {
-                    CircularProgressIndicator(color = TravelGreen)
+                    CircularProgressIndicator(color = TravelGreen) //indicatore di caricamento circolare
                 }
-            } else if (filteredTrips.isEmpty()) {
-                // Mostra messaggio se non ci sono viaggi
+            } else if (filteredTrips.isEmpty()) { //mostra schermata vuota se non ci sono viaggi
                 EmptyTripsList(hasFilter = selectedFilter != null)
             } else {
-                // Mostra la lista dei viaggi
-                LazyColumn(
+                LazyColumn( //lista scorrevole per i viaggi
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(16.dp), //margini interni della lista
+                    verticalArrangement = Arrangement.spacedBy(12.dp) //spazio tra gli elementi
                 ) {
-                    // Per ogni viaggio nella lista, crea una card
-                    items(filteredTrips) { trip ->
-                        TripCard(
-                            trip = trip,
-                            onClick = { onTripClick(trip) }
+                    items(filteredTrips) { trip -> //itera sui viaggi filtrati
+                        TripCard( //mostra una card per ogni viaggio
+                            trip = trip, //oggetto viaggio corrente
+                            onClick = { onTripClick(trip) } //richiama callback con viaggio selezionato
                         )
                     }
                 }
             }
         }
 
-        // Menu a tendina per i filtri
-        DropdownMenu(
-            expanded = showFilterMenu,
-            onDismissRequest = { showFilterMenu = false },
+        DropdownMenu( //menu a tendina per selezionare il filtro
+            expanded = showFilterMenu, //visibilità controllata da stato locale
+            onDismissRequest = { showFilterMenu = false }, //chiude il menu se l’utente clicca fuori
             modifier = Modifier.background(Color.White)
         ) {
-            // Opzione "Tutti i viaggi" (rimuove filtro)
-            DropdownMenuItem(
+            DropdownMenuItem( //opzione per mostrare tutti i viaggi
                 text = { Text("Tutti i viaggi", color = Color.Black) },
                 onClick = {
-                    selectedFilter = null
-                    showFilterMenu = false
+                    selectedFilter = null //rimuove filtro
+                    showFilterMenu = false //chiude il menu
                 }
             )
-            Divider()
-            // Opzioni per ogni tipo di viaggio
-            listOf("Local trip", "Day trip", "Multi-day trip").forEach { tripType ->
+            Divider() //linea di separazione tra le opzioni
+            listOf("Local trip", "Day trip", "Multi-day trip").forEach { tripType -> //crea dinamicamente le voci filtro
                 DropdownMenuItem(
-                    text = { Text(tripType, color = Color.Black) },
+                    text = { Text(tripType, color = Color.Black) }, //mostra nome del tipo
                     onClick = {
-                        selectedFilter = tripType
-                        showFilterMenu = false
+                        selectedFilter = tripType //applica filtro selezionato
+                        showFilterMenu = false //chiude menu
                     }
                 )
             }
@@ -209,166 +188,156 @@ fun TripListScreen(
     }
 }
 
+
 /**
- * ⭐ COMPONENTE AGGIORNATO: Card viaggio con date effettive
- *
- * Modifiche:
- * - Usa getFormattedDateRange() per mostrare date corrette
- * - Mostra durata tracking se disponibile
- * - Indica visivamente se le date effettive sono diverse
+ * Rappresenta singolo viaggio all'interno della lista principale
+ogni card mostra le informazioni principali del viaggio:
+destinazione, date, tipo e stato;
+eventuale durata gps e distanza;
+una breve descrizione se disponibile.
  */
 @Composable
 fun TripCard(
-    trip: Trip,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    trip: Trip, //oggetto dati che rappresenta un singolo viaggio salvato
+    onClick: () -> Unit, //callback eseguita quando l’utente clicca sulla card
+    modifier: Modifier = Modifier //modifier per personalizzare margini o dimensioni esterne
 ) {
-    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
+    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN) //formatter locale per gestire e mostrare le date in formato italiano
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .fillMaxWidth() //la card occupa tutta la larghezza disponibile
+            .clickable(onClick = onClick), //rende la card cliccabile per aprire il dettaglio
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = Color.White //sfondo bianco
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), //aggiunge ombra
+        shape = RoundedCornerShape(12.dp) //angoli arrotondati
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+                .fillMaxWidth() //colonna interna che occupa tutta la larghezza
+                .padding(16.dp) //padding interno per distanziare il contenuto dai bordi
         ) {
-            // RIGA 1: Destinazione
+            //riga 1: destinazione del viaggio con icona e titolo
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically //centra icona e testo verticalmente
             ) {
                 Icon(
-                    imageVector = Icons.Default.LocationOn,
+                    imageVector = Icons.Default.LocationOn, //icona localizzazione per rappresentare la destinazione
                     contentDescription = null,
                     tint = TravelGreen,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp) //dimensione compatta dell’icona
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp)) //spazio tra icona e testo
                 Text(
-                    text = trip.destination,
+                    text = trip.destination, //mostra il nome della destinazione
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp)) //spazio verticale tra righe
 
-            // ⭐ RIGA 2: Date (usa funzione del modello per mostrare date corrette)
+            //riga 2: mostra il range di date del viaggio
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(), //riga a larghezza piena
+                horizontalArrangement = Arrangement.SpaceBetween, //distribuisce i contenuti agli estremi se necessario
+                verticalAlignment = Alignment.CenterVertically //centra il testo verticalmente
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    // Date formattate (usa il metodo del Trip)
+                Column(modifier = Modifier.weight(1f)) { //colonna che si adatta allo spazio disponibile
                     Text(
-                        text = trip.getFormattedDateRange(),
+                        text = trip.getFormattedDateRange(), //usa metodo del modello per ottenere la stringa date già formattata
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (trip.hasDifferentActualDates()) {
-                            Color(0xFF2E7D32) // Verde se date effettive diverse
+                        color = if (trip.hasDifferentActualDates()) { //cambia colore se le date effettive sono diverse da quelle pianificate
+                            Color(0xFF2E7D32) //verde per evidenziare variazioni
                         } else {
-                            Color.Gray
+                            Color.Gray //grigio per date standard
                         }
                     )
 
-                    // ⭐ NUOVO: Mostra durata tracking se viaggio completato
-                    if (trip.isCompleted && trip.totalTrackingDurationMs > 0) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                    if (trip.isCompleted && trip.totalTrackingDurationMs > 0) { //mostra solo se il viaggio è completato e il gps ha registrato durata
+                        Spacer(modifier = Modifier.height(2.dp)) //piccolo spazio prima del testo
                         Text(
-                            text = "GPS attivo: ${trip.getFormattedDuration()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF4CAF50),
-                            fontWeight = FontWeight.Medium
+                            text = "GPS attivo: ${trip.getFormattedDuration()}", //mostra durata totale registrata dal gps
+                            style = MaterialTheme.typography.bodySmall, //stile piccolo per informazione aggiuntiva
+                            color = Color(0xFF4CAF50), //verde chiaro per indicare attività positiva
+                            fontWeight = FontWeight.Medium //peso medio per distinguere dal testo principale
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp)) //spazio tra sezione date e successiva
 
-            // RIGA 3: Tipo viaggio e stato
+            //riga 3: mostra tipo di viaggio e stato attuale
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.SpaceBetween, //distribuisce tipo e badge stato agli estremi
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Chip per il tipo di viaggio
                 Surface(
-                    color = TravelGreen.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(16.dp)
+                    color = TravelGreen.copy(alpha = 0.2f), //sfondo leggero per evidenziare tipo viaggio
+                    shape = RoundedCornerShape(16.dp) //forma arrotondata
                 ) {
                     Text(
-                        text = trip.tripType,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        text = trip.tripType, //mostra la categoria del viaggio
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), //padding interno
                         style = MaterialTheme.typography.bodySmall,
                         color = TravelGreen,
                         fontWeight = FontWeight.Medium
                     )
                 }
 
-                // Badge per lo stato del viaggio
-                StatusBadge(status = trip.status)
+                StatusBadge(status = trip.status) //mostra badge colorato per stato (pianificato, in corso, completato)
             }
 
-            // ⭐ RIGA 3.5: Descrizione (se presente)
-            if (trip.description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Card interna per la descrizione con sfondo leggero
+            //riga 3.5: mostra descrizione solo se è stata compilata
+            if (trip.description.isNotBlank()) { //condizione per non occupare spazio se campo vuoto
+                Spacer(modifier = Modifier.height(12.dp)) //distanza tra blocchi
                 Surface(
-                    color = TravelGreen.copy(alpha = 0.05f),
+                    color = TravelGreen.copy(alpha = 0.05f), //sfondo molto tenue per differenziare la sezione descrizione
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth() //occupa tutta la larghezza della card
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.Top
+                        modifier = Modifier.padding(12.dp), //padding interno della card secondaria
+                        verticalAlignment = Alignment.Top //allinea in alto icona e testo
                     ) {
-                        // Icona descrizione
                         Icon(
-                            imageVector = Icons.Filled.Notes,
+                            imageVector = Icons.Filled.Notes, //icona per rappresentare le note/descrizione
                             contentDescription = null,
                             tint = TravelGreen,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp) //dimensione ridotta per coerenza con testo piccolo
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        // Testo della descrizione (max 3 righe)
+                        Spacer(modifier = Modifier.width(8.dp)) //spazio tra icona e testo
                         Text(
-                            text = trip.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.DarkGray,
-                            maxLines = 3, // Mostra max 3 righe, poi "..."
-                            modifier = Modifier.weight(1f)
+                            text = trip.description, //testo della descrizione inserita dall’utente
+                            style = MaterialTheme.typography.bodySmall, //stile piccolo per testo secondario
+                            color = Color.DarkGray, //colore neutro ma leggibile
+                            maxLines = 3, //limita la visualizzazione a tre righe
+                            modifier = Modifier.weight(1f) //consente al testo di occupare lo spazio rimanente
                         )
                     }
                 }
             }
 
-            // RIGA 4: Distanza (se presente e > 0)
-            if (trip.totalDistanceKm > 0) {
-                Spacer(modifier = Modifier.height(8.dp))
+            if (trip.totalDistanceKm > 0) { //mostra la distanza solo se è maggiore di zero
+                Spacer(modifier = Modifier.height(8.dp)) //piccolo spazio sopra la riga distanza
                 Text(
-                    text = "Distanza: ${String.format("%.1f", trip.totalDistanceKm)} km",
+                    text = "Distanza: ${String.format("%.1f", trip.totalDistanceKm)} km", //mostra la distanza percorsa formattata con una cifra decimale
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
             }
 
-            // RIGA 5: Coordinate GPS (se presenti)
-            if (trip.destinationLat != null && trip.destinationLng != null) {
-                Spacer(modifier = Modifier.height(4.dp))
+            if (trip.destinationLat != null && trip.destinationLng != null) { //verifica che ci siano coordinate valide
+                Spacer(modifier = Modifier.height(4.dp)) //spazio leggero tra le righe
                 Text(
-                    text = "GPS: ${String.format("%.4f", trip.destinationLat)}, ${String.format("%.4f", trip.destinationLng)}",
+                    text = "GPS: ${String.format("%.4f", trip.destinationLat)}, ${String.format("%.4f", trip.destinationLng)}", //mostra coordinate con quattro decimali
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
+                    color = Color.Gray //colore neutro per informazione tecnica
                 )
             }
         }
@@ -376,76 +345,83 @@ fun TripCard(
 }
 
 /**
- * Badge colorato che mostra lo stato del viaggio.
- * Colori diversi per stati diversi (Pianificato, In corso, Completato).
+ * mostra un piccolo badge colorato che indica lo stato attuale del viaggio.
+ * il colore e il testo del badge cambiano in base allo stato del viaggio:
+ * - verde per "Completato"
+ * - arancione per "In corso"
+ * - grigio per "Pianificato" o altri stati non riconosciuti
+ * utilizza un componente Surface con forma arrotondata e testo centrato.
  */
 @Composable
 fun StatusBadge(status: String) {
-    // Scegliamo il colore in base allo stato
+    //sceglie il colore di base in base allo stato del viaggio
     val backgroundColor = when (status) {
-        "Completato" -> Color(0xFF4CAF50) // Verde
-        "In corso" -> Color(0xFFFFA726) // Arancione
-        else -> Color(0xFF90A4AE) // Grigio (Pianificato)
+        "Completato" -> Color(0xFF4CAF50) //verde per indicare completamento
+        "In corso" -> Color(0xFFFFA726) //arancione per viaggio attivo
+        else -> Color(0xFF90A4AE) //grigio per stato pianificato o sconosciuto
     }
 
     Surface(
-        color = backgroundColor.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(16.dp)
+        color = backgroundColor.copy(alpha = 0.2f), //usa una versione trasparente
+        shape = RoundedCornerShape(16.dp) //bordo arrotondato
     ) {
         Text(
-            text = status,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            text = status, //mostra lo stato come testo leggibile
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), //padding interno per dare spessore visivo al badge
             style = MaterialTheme.typography.bodySmall,
-            color = backgroundColor,
-            fontWeight = FontWeight.Bold
+            color = backgroundColor, //colore del testo identico alla versione piena del colore di stato
+            fontWeight = FontWeight.Bold //testo in grassetto per evidenziare lo stato
         )
     }
 }
 
+
 /**
- * Schermata vuota mostrata quando non ci sono viaggi.
- * Cambia messaggio in base alla presenza di filtri attivi.
+ * mostra una schermata di stato vuoto quando non ci sono viaggi da visualizzare.
+ * viene utilizzata in TripListScreen per gestire due casi distinti:
+ * - quando non ci sono viaggi salvati (nessun contenuto)
+ * - quando un filtro è attivo ma non restituisce risultati
  */
 @Composable
 fun EmptyTripsList(hasFilter: Boolean) {
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        contentAlignment = Alignment.Center
+            .fillMaxSize() //riempie l’intero spazio disponibile sullo schermo
+            .padding(32.dp), //aggiunge margine interno per distanziare il contenuto dai bordi
+        contentAlignment = Alignment.Center //centra verticalmente e orizzontalmente il contenuto
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            horizontalAlignment = Alignment.CenterHorizontally, //centra tutti gli elementi orizzontalmente
+            verticalArrangement = Arrangement.Center //distribuisce gli elementi in verticale al centro del box
         ) {
-            // Emoji grande
+            //emoji principale che cambia in base al contesto (filtrato o no)
             Text(
-                text = if (hasFilter) "🔍" else "✈️",
+                text = if (hasFilter) "🔍" else "✈️", //mostra lente di ingrandimento se è attivo un filtro, altrimenti aereo
                 fontSize = 64.sp
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp)) //spazio tra emoji e messaggio principale
 
-            // Messaggio principale
+            //messaggio principale che informa l’utente della mancanza di risultati
             Text(
                 text = if (hasFilter) {
-                    "Nessun viaggio trovato"
+                    "Nessun viaggio trovato" //testo mostrato quando il filtro non produce risultati
                 } else {
-                    "Nessun viaggio salvato"
+                    "Nessun viaggio salvato" //testo mostrato quando non ci sono viaggi registrati
                 },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp)) //spazio tra messaggio principale e quello secondario
 
-            // Messaggio secondario
+            //messaggio secondario con suggerimento per l’utente
             Text(
                 text = if (hasFilter) {
-                    "Prova a rimuovere il filtro"
+                    "Prova a rimuovere il filtro" //invita a disattivare il filtro per visualizzare altri viaggi
                 } else {
-                    "Crea il tuo primo viaggio dal menu principale"
+                    "Crea il tuo primo viaggio dal menu principale" //messaggio guida per utenti nuovi
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray

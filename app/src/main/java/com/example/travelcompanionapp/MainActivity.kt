@@ -25,65 +25,60 @@ import com.example.travelcompanionapp.ui.theme.TravelCompanionAppTheme
 import com.example.travelcompanionapp.utils.ActivityRecognitionHelper
 import com.example.travelcompanionapp.viewmodel.TripViewModel
 
-/**
- * Activity principale dell'app.
- *
- * ⭐ AGGIORNATA per richiedere permessi per background jobs:
- * - POST_NOTIFICATIONS (Android 13+)
- * - ACTIVITY_RECOGNITION (Android 10+)
- */
+
+//activity principale dell’app, punto di ingresso dell’interfaccia compose
+//gestisce i permessi runtime, inizializza il viewmodel e imposta la navigazione tra le schermate
 class MainActivity : ComponentActivity() {
 
-    // ⭐ Launcher per richiedere permessi multipli
+    //launcher che mostra il dialog di sistema per richiedere più permessi contemporaneamente
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        // Callback quando l'utente risponde alla richiesta permessi
+        //callback eseguita quando l’utente risponde alla richiesta dei permessi
 
         val notificationGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: true
         val activityGranted = permissions[Manifest.permission.ACTIVITY_RECOGNITION] ?: true
 
         println("📱 Permessi: Notifiche=$notificationGranted, Activity=$activityGranted")
 
-        // Se il permesso Activity Recognition è stato concesso, avvia il monitoraggio
+        //se il permesso per activity recognition è stato concesso, avvia il monitoraggio automatico
         if (activityGranted) {
             ActivityRecognitionHelper.startActivityRecognition(this)
         }
     }
 
+    //funzione chiamata alla creazione dell’activity
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ⭐ Richiedi permessi necessari all'avvio
+        //richiede i permessi necessari per notifiche e activity recognition
         requestNecessaryPermissions()
 
+        //imposta il contenuto visivo dell’app usando jetpack compose
         setContent {
             TravelCompanionAppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    //ottiene il repository condiviso tramite l’applicazione
                     val appRepository = (application as TravelCompanionApplication).repository
+                    //crea un’istanza di tripviewmodel usando la factory
                     val viewModel: TripViewModel = viewModel(
                         factory = TripViewModel.Factory(appRepository)
                     )
+                    //carica il sistema di navigazione principale dell’app
                     TravelCompanionNavHost(viewModel = viewModel)
                 }
             }
         }
     }
 
-    /**
-     * Richiede i permessi necessari per i background jobs.
-     *
-     * Permessi richiesti:
-     * - POST_NOTIFICATIONS (Android 13+): per inviare notifiche
-     * - ACTIVITY_RECOGNITION (Android 10+): per rilevare movimento
-     */
+    //funzione privata che verifica e richiede i permessi runtime richiesti da android 10+ e 13+
     private fun requestNecessaryPermissions() {
         val permissionsToRequest = mutableListOf<String>()
 
-        // Permesso notifiche (Android 13+)
+        //controlla il permesso per le notifiche
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
@@ -92,7 +87,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Permesso Activity Recognition (Android 10+)
+        //controlla il permesso per il rilevamento attività
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
                 != PackageManager.PERMISSION_GRANTED
@@ -101,36 +96,39 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Se ci sono permessi da richiedere, mostra il dialog di sistema
+        //se ci sono permessi mancanti, avvia il launcher per mostrarne la richiesta all’utente
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 }
 
-// === Resto del codice invariato (Destinations, NavHost, ecc.) ===
+//=== oggetto che definisce tutte le rotte di navigazione interne dell’app ===
 object Destinations {
-    const val SPLASH_ROUTE = "splash_route"
-    const val MAIN_MENU_ROUTE = "main_menu_route"
-    const val LIST_ROUTE = "list_route"
-    const val ENTRY_ROUTE = "entry_route"
-    const val TRACKING_ROUTE = "tracking_route"
-    const val BACKGROUND_SETTINGS_ROUTE = "background_settings_route"
-    const val MAP_SELECTION_ROUTE = "map_selection_route"
-    const val TRIP_DETAIL_ROUTE = "trip_detail_route/{tripId}"
+    const val SPLASH_ROUTE = "splash_route" //schermata iniziale
+    const val MAIN_MENU_ROUTE = "main_menu_route" //menu principale
+    const val LIST_ROUTE = "list_route" //lista viaggi salvati
+    const val ENTRY_ROUTE = "entry_route" //form di inserimento viaggio
+    const val TRACKING_ROUTE = "tracking_route" //schermata di tracking gps
+    const val BACKGROUND_SETTINGS_ROUTE = "background_settings_route" //sezione statistiche o impostazioni
+    const val MAP_SELECTION_ROUTE = "map_selection_route" //mappa per selezionare destinazione
+    const val TRIP_DETAIL_ROUTE = "trip_detail_route/{tripId}" //dettaglio singolo viaggio
 
+    //funzione di utilità per costruire dinamicamente la rotta del dettaglio
     fun tripDetailRoute(tripId: Int) = "trip_detail_route/$tripId"
 }
 
+//=== composable che gestisce tutta la navigazione tra le schermate dell’app ===
 @Composable
 fun TravelCompanionNavHost(viewModel: TripViewModel) {
-    val navController = rememberNavController()
-    val uiState by viewModel.uiState.collectAsState()
+    val navController = rememberNavController() //gestisce la navigazione tra le schermate
+    val uiState by viewModel.uiState.collectAsState() //osserva lo stato dell’elenco viaggi
 
     NavHost(
         navController = navController,
-        startDestination = Destinations.SPLASH_ROUTE
+        startDestination = Destinations.SPLASH_ROUTE //schermata iniziale
     ) {
+        //schermata splash con pulsante per iniziare
         composable(Destinations.SPLASH_ROUTE) {
             SchermataIniziale(
                 onStartClick = {
@@ -141,6 +139,7 @@ fun TravelCompanionNavHost(viewModel: TripViewModel) {
             )
         }
 
+        //menu principale con accesso alle sezioni principali
         composable(Destinations.MAIN_MENU_ROUTE) {
             MainMenuScreen(
                 onAddTripClick = { navController.navigate(Destinations.ENTRY_ROUTE) },
@@ -150,6 +149,7 @@ fun TravelCompanionNavHost(viewModel: TripViewModel) {
             )
         }
 
+        //schermata di inserimento nuovo viaggio
         composable(Destinations.ENTRY_ROUTE) {
             TripEntryScreen(
                 viewModel = viewModel,
@@ -158,6 +158,7 @@ fun TravelCompanionNavHost(viewModel: TripViewModel) {
             )
         }
 
+        //schermata mappa per selezionare una destinazione
         composable(Destinations.MAP_SELECTION_ROUTE) {
             MapSelectionScreen(
                 onDestinationSelected = viewModel::updateDestinationCoordinates,
@@ -165,6 +166,7 @@ fun TravelCompanionNavHost(viewModel: TripViewModel) {
             )
         }
 
+        //lista di tutti i viaggi registrati
         composable(Destinations.LIST_ROUTE) {
             TripListScreen(
                 viewModel = viewModel,
@@ -173,6 +175,7 @@ fun TravelCompanionNavHost(viewModel: TripViewModel) {
             )
         }
 
+        //dettaglio di un singolo viaggio selezionato dalla lista
         composable(
             route = Destinations.TRIP_DETAIL_ROUTE,
             arguments = listOf(navArgument("tripId") { type = NavType.IntType })
@@ -186,10 +189,12 @@ fun TravelCompanionNavHost(viewModel: TripViewModel) {
                     onNavigateBack = { navController.popBackStack() }
                 )
             } else {
+                //se il viaggio non è trovato, torna alla schermata precedente
                 LaunchedEffect(Unit) { navController.popBackStack() }
             }
         }
 
+        //schermata di tracciamento in tempo reale (gps)
         composable(Destinations.TRACKING_ROUTE) {
             TripTrackingScreen(
                 viewModel = viewModel,
@@ -197,7 +202,7 @@ fun TravelCompanionNavHost(viewModel: TripViewModel) {
             )
         }
 
-        // ⭐ Display Charts Screen
+        //schermata che mostra grafici o impostazioni avanzate
         composable(Destinations.BACKGROUND_SETTINGS_ROUTE) {
             DisplayChartsScreen(
                 viewModel = viewModel,
@@ -207,6 +212,7 @@ fun TravelCompanionNavHost(viewModel: TripViewModel) {
     }
 }
 
+//composable di placeholder per funzionalità non ancora implementate
 @Composable
 fun PlaceholderScreen(title: String) {
     Column(
@@ -216,6 +222,9 @@ fun PlaceholderScreen(title: String) {
     ) {
         Text(text = title, style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "Questa funzionalità sarà implementata prossimamente", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = "Questa funzionalità sarà implementata prossimamente",
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }

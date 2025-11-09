@@ -86,12 +86,10 @@ dependencies {
     // === COROUTINES ===
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
-    // === ⭐ GESTIONE FOTO ===
+    // === GESTIONE FOTO ===
     // ExifInterface per leggere i metadati delle immagini (orientamento, GPS, ecc.)
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
-    // Coil per il caricamento efficiente delle immagini (opzionale ma consigliato)
-    // implementation("io.coil-kt:coil-compose:2.5.0")
 
     // === TESTING === //
     testImplementation(libs.junit)

@@ -1,6 +1,6 @@
 package com.example.travelcompanionapp.data
 
-import androidx.room.Dao
+import androidx.room.Dao //dao è interfaccia che definisce come interagire con il databse
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Data Access Object (DAO) per l'entità Trip.
+ * Il DAO è un'INTERFACCIA (non una classe):
+ * - definisci COSA vuoi fare (es: "getAllTrips")
+ * - Room genera automaticamente il CODICE che lo fa
  * Definisce i metodi che il resto dell'app utilizzerà per leggere e scrivere i dati.
  */
 @Dao//contrassegna l'interfaccia come un DAO di Room
@@ -40,14 +43,9 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE isCompleted = 1 ORDER BY startDate DESC") // Query SQL per selezionare solo i viaggi con isCompleted = true (1 in SQLite)
     fun getCompletedTrips(): Flow<List<Trip>>// Funzione che restituisce un Flow di liste di Trip completati
 
-    /**
-     * Ottiene tutti i viaggi in modo sincrono (per uso in WorkManager).
-     *
-     * A differenza di getAllTrips() che restituisce un Flow (reattivo),
-     * questa funzione restituisce direttamente la lista dei viaggi.
-     *
-     * Usata da ReminderWorker per controllare l'ultimo viaggio.
-     */
+    //Ottiene tutti i viaggi in modo sincrono.
+     // A differenza di getAllTrips() che restituisce un Flow (reattivo),questa funzione restituisce direttamente la lista dei viaggi.
+     // Usata da ReminderWorker per controllare l'ultimo viaggio.
     @Query("SELECT * FROM trips ORDER BY startDate DESC")
     suspend fun getAllTripsSync(): List<Trip>
 }

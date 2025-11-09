@@ -1,29 +1,39 @@
-package com.example.travelcompanionapp.receivers
+package com.example.travelcompanionapp.receivers //"receivers" sono componenti Android che ricevono notifiche dal sistema
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
+import android.content.BroadcastReceiver //componente base per ricevere eventi di sistema
+import android.content.Context //Context per accedere alle risorse dell'applicazione
+import android.content.Intent //oggetto che contiene i dati dell'evento ricevuto
 import com.example.travelcompanionapp.utils.ActivityRecognitionHelper
 import com.example.travelcompanionapp.utils.NotificationHelper
-import com.google.android.gms.location.ActivityTransitionResult
+import com.google.android.gms.location.ActivityTransitionResult //classe di Google Play Services che contiene i risultati del riconoscimento attività
 
 /**
  * BroadcastReceiver che riceve gli eventi dall'Activity Recognition API.
  *
+ * COS'È UN BROADCASTRECEIVER?
+ * Oggetto che riceve messaggi dal sistema operativo Android.
+ * In questo caso, riceve notifiche quando l'utente inizia un'attività fisica
+ * (camminare, correre, guidare, andare in bici).
+ *
+ * COME FUNZIONA?
+ * 1. L'app si registra per ricevere notifiche di movimento
+ * 2. Google Play Services monitora i sensori del telefono in background
+ * 3. Quando rileva che l'utente ha iniziato a muoversi, invia un Intent
+ * 4. Questo BroadcastReceiver riceve l'Intent e lo processa
+ * 5. L'app mostra una notifica per chiedere se vuole tracciare
+ *
  * Viene chiamato automaticamente dal sistema quando l'utente inizia
  * un'attività monitorata (camminare, guidare, andare in bici).
  *
- * Conforme alle specifiche:
- * "The app detects when the user is moving and prompts them to start logging"
  */
-class ActivityRecognitionReceiver : BroadcastReceiver() {
+class ActivityRecognitionReceiver : BroadcastReceiver() { //estende BroadcastReceiver, la classe base per ricevere broadcast dal sistema
 
-    /**
-     * Metodo chiamato quando arriva un evento di transizione.
-     *
-     * @param context Contesto dell'applicazione
-     * @param intent Intent contenente i dati dell'evento
-     */
+
+    //Metodo chiamato quando arriva un evento di transizione.
+    // Parametri:
+    //   - context: permette di accedere alle risorse dell'app (database, preferences, ecc.)
+    //   - intent: contiene i dati dell'evento (che attività è stata rilevata)
+
     override fun onReceive(context: Context, intent: Intent) {
         // Controlla se l'intent contiene risultati di transizione
         if (ActivityTransitionResult.hasResult(intent)) {
@@ -37,6 +47,15 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
 
                     // Ottiene il tipo di attività rilevata
                     val activityType = event.activityType
+                    // event.activityType = codice numerico che identifica l'attività
+                    //
+                    // CODICI DELL'API:
+                    // - 0 = IN_VEHICLE (in veicolo, guidando)
+                    // - 1 = ON_BICYCLE (in bicicletta)
+                    // - 2 = ON_FOOT (a piedi, camminando o correndo)
+                    // - 3 = STILL (fermo)
+                    // - 7 = WALKING (camminando)
+                    // - 8 = RUNNING (correndo)
 
                     // Ottiene il tipo di transizione (ENTER = inizia, EXIT = finisce)
                     val transitionType = event.transitionType
@@ -59,9 +78,6 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
                                 activityType = activityName
                             )
 
-                            // Salva nelle SharedPreferences l'ultima attività rilevata
-                            // (utile per mostrare suggerimenti nell'UI)
-                            saveLastDetectedActivity(context, activityName)
                         }
                     }
                 }
@@ -69,42 +85,4 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
         }
     }
 
-    /**
-     * Salva l'ultima attività rilevata nelle SharedPreferences.
-     *
-     * Questo permette all'app di mostrare suggerimenti personalizzati
-     * quando l'utente apre la schermata di tracking.
-     *
-     * @param context Contesto dell'applicazione
-     * @param activityName Nome dell'attività rilevata
-     */
-    private fun saveLastDetectedActivity(context: Context, activityName: String) {
-        val sharedPrefs = context.getSharedPreferences("travel_companion_prefs", Context.MODE_PRIVATE)
-        sharedPrefs.edit().apply {
-            putString("last_detected_activity", activityName)
-            putLong("last_activity_time", System.currentTimeMillis())
-            apply()
-        }
-    }
-
-    /**
-     * FUNZIONE HELPER: Legge l'ultima attività rilevata.
-     * Puoi usarla in TripTrackingScreen per mostrare suggerimenti.
-     *
-     * Esempio:
-     * "Abbiamo rilevato che stai guidando. Vuoi iniziare il tracking?"
-     */
-    companion object {
-        fun getLastDetectedActivity(context: Context): Pair<String?, Long>? {
-            val sharedPrefs = context.getSharedPreferences("travel_companion_prefs", Context.MODE_PRIVATE)
-            val activity = sharedPrefs.getString("last_detected_activity", null)
-            val time = sharedPrefs.getLong("last_activity_time", 0)
-
-            return if (activity != null && time > 0) {
-                Pair(activity, time)
-            } else {
-                null
-            }
-        }
-    }
 }

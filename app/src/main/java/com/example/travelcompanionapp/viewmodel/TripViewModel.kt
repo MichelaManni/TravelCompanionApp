@@ -1,4 +1,4 @@
-package com.example.travelcompanionapp.viewmodel
+package com.example.travelcompanionapp.viewmodel//responsabile della logica tra repository e ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -14,42 +14,32 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-/**
- * ViewModel per gestire lo stato dell'interfaccia utente e le operazioni sui viaggi.
- * Comunica con il Repository e fornisce i dati alle UI attraverso Flow e StateFlow.
- *
- * ⭐ AGGIORNAMENTI:
- * - Aggiunta gestione completa delle foto
- * - Aggiunta funzione per determinare stato temporale del viaggio
- * - Supporto per creazione viaggio rapido
- */
+// viewmodel gestisce tutti i dati relativi ai viaggi e fornisce stato e logica alla ui
+//comunica con il repository per eseguire operazioni sul database e mantiene gli stati dell’interfaccia tramite flow e stateflow
+//include funzioni per la creazione, modifica e cancellazione di viaggi, note e foto, oltre a metodi per gestire lo stato temporale dei viaggi
 class TripViewModel(private val repository: TripRepository) : ViewModel() {
 
-    // === STATO GENERALE DELL'APP (lista viaggi) ===
-    /**
-     * StateFlow che emette lo stato attuale dell'UI per la lista viaggi.
-     * Viene osservato dalle schermate per reagire ai cambiamenti.
-     */
+    //=== stato generale dell’app (lista viaggi) ===
+    //stateflow che emette continuamente l’elenco aggiornato dei viaggi salvati
     val uiState: StateFlow<TripUiState> = repository.getAllTripsStream()
-        .map { trips -> TripUiState(tripList = trips) }
+        .map { trips -> TripUiState(tripList = trips) } //mappa i dati provenienti dal repository nello stato dell’interfaccia
         .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = TripUiState()
+            scope = viewModelScope, //ambito del viewmodel per mantenere il flusso attivo finché la ui è in uso
+            started = SharingStarted.WhileSubscribed(5000), //mantiene vivo il flusso per 5 secondi dopo l’ultima sottoscrizione
+            initialValue = TripUiState() //stato iniziale vuoto
         )
+
+    //flusso separato che contiene solo i viaggi completati
     val completedTrips: Flow<List<Trip>> = repository.completedTrips
-    // === STATO DEI DETTAGLI DEL VIAGGIO (per inserimento/modifica) ===
-    /**
-     * MutableStateFlow che contiene i dettagli del viaggio in fase di inserimento/modifica.
-     */
+
+    //=== stato dei dettagli del viaggio (per form di inserimento o modifica) ===
+    //statoflow mutabile usato per aggiornare dinamicamente i campi del form
     private val _tripDetailsUiState = MutableStateFlow(TripDetailsUiState())
     val tripDetailsUiState: StateFlow<TripDetailsUiState> = _tripDetailsUiState.asStateFlow()
 
-    // === FUNZIONI PER AGGIORNARE I CAMPI DEL FORM ===
+    //=== funzioni per aggiornare i campi del form ===
 
-    /**
-     * Aggiorna il campo destinazione.
-     */
+    //aggiorna il campo destinazione e ricalcola la validità dei dati
     fun updateDestination(destination: String) {
         _tripDetailsUiState.update { currentState ->
             currentState.copy(
@@ -64,9 +54,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Aggiorna le coordinate GPS della destinazione (da mappa).
-     */
+    //aggiorna i dati gps della destinazione selezionata da mappa
     fun updateDestinationCoordinates(name: String, lat: Double, lng: Double) {
         _tripDetailsUiState.update { currentState ->
             currentState.copy(
@@ -83,9 +71,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Aggiorna la data di inizio.
-     */
+    //aggiorna la data di inizio viaggio e valida il form
     fun updateStartDate(startDate: String) {
         _tripDetailsUiState.update { currentState ->
             currentState.copy(
@@ -100,9 +86,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Aggiorna la data di fine.
-     */
+    //aggiorna la data di fine viaggio e valida i dati
     fun updateEndDate(endDate: String) {
         _tripDetailsUiState.update { currentState ->
             currentState.copy(
@@ -117,9 +101,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Aggiorna il tipo di viaggio.
-     */
+    //aggiorna il tipo di viaggio selezionato e valida l’input
     fun updateTripType(tripType: String) {
         _tripDetailsUiState.update { currentState ->
             currentState.copy(
@@ -134,29 +116,22 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Aggiorna la descrizione generale del viaggio.
-     * La descrizione è opzionale, quindi non influenza la validazione del form.
-     */
+    //aggiorna la descrizione del viaggio, campo opzionale che non influisce sulla validazione
     fun updateDescription(description: String) {
         _tripDetailsUiState.update { currentState ->
             currentState.copy(description = description)
         }
     }
 
-    // === OPERAZIONI SUL DATABASE (VIAGGI) ===
+    //=== operazioni sul database (viaggi) ===
 
-    /**
-     * Salva un nuovo viaggio nel database.
-     * Converte i dati dal form in un oggetto Trip e lo inserisce tramite il repository.
-     */
+    //salva un nuovo viaggio convertendo i dati del form in un oggetto trip
     fun saveTrip() {
         val currentState = _tripDetailsUiState.value
 
-        if (!currentState.isEntryValid) return
+        if (!currentState.isEntryValid) return //interrompe se i dati non sono validi
 
-        // Formattatore per convertire le stringhe in Date
-        val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN)
+        val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.ITALIAN) //formattatore per le date
 
         viewModelScope.launch {
             try {
@@ -167,27 +142,19 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
                     startDate = dateFormatter.parse(currentState.startDate) ?: Date(),
                     endDate = dateFormatter.parse(currentState.endDate) ?: Date(),
                     tripType = currentState.tripType,
-                    status = "Pianificato", // Stato iniziale
+                    status = "Pianificato", //stato iniziale del viaggio
                     description = currentState.description
                 )
-                repository.insertTrip(trip)
+                repository.insertTrip(trip) //inserisce nel database
 
-                // Reset del form dopo il salvataggio
-                _tripDetailsUiState.value = TripDetailsUiState()
+                _tripDetailsUiState.value = TripDetailsUiState() //reset del form dopo il salvataggio
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
-    /**
-     * ⭐ NUOVA: Crea e salva un viaggio rapido con date di oggi.
-     * Utile per iniziare a tracciare immediatamente senza pianificazione.
-     *
-     * @param destination Nome della destinazione
-     * @param tripType Tipo di viaggio (Local trip, Day trip, etc.)
-     * @param description Descrizione opzionale
-     */
+    //crea e salva un viaggio rapido con data odierna (utile per tracking immediato)
     suspend fun createQuickTrip(
         destination: String,
         tripType: String,
@@ -205,10 +172,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         repository.insertTrip(trip)
     }
 
-    /**
-     * Aggiorna un viaggio esistente nel database.
-     * Usata ad esempio per salvare la distanza percorsa dopo il tracking.
-     */
+    //aggiorna i dati di un viaggio esistente
     fun updateTrip(trip: Trip) {
         viewModelScope.launch {
             try {
@@ -219,43 +183,26 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Cancella un viaggio dal database.
-     */
+    //elimina un viaggio dal database
     fun deleteTrip(trip: Trip) {
         viewModelScope.launch {
             repository.deleteTrip(trip)
         }
     }
 
-    // === OPERAZIONI SULLE NOTE ===
+    //=== operazioni sulle note ===
 
-    /**
-     * Ottiene tutte le note di un viaggio specifico.
-     *
-     * @param tripId ID del viaggio
-     * @return Flow che emette la lista aggiornata delle note
-     */
+    //restituisce tutte le note associate a un viaggio
     fun getNotesForTrip(tripId: Int): Flow<List<TripNote>> {
         return repository.getNotesForTrip(tripId)
     }
 
-    /**
-     * Ottiene le ultime 3 note di un viaggio.
-     * Utile per mostrare un'anteprima durante il tracking.
-     *
-     * @param tripId ID del viaggio
-     * @return Flow con le ultime 3 note
-     */
+    //restituisce solo le ultime 3 note per anteprima rapida
     fun getRecentNotesForTrip(tripId: Int): Flow<List<TripNote>> {
         return repository.getRecentNotesForTrip(tripId, limit = 3)
     }
 
-    /**
-     * Inserisce una nuova nota nel database.
-     *
-     * @param note Nota da inserire
-     */
+    //inserisce una nuova nota nel database
     fun insertNote(note: TripNote) {
         viewModelScope.launch {
             try {
@@ -266,56 +213,31 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Cancella una nota dal database.
-     *
-     * @param note Nota da cancellare
-     */
+    //cancella una nota esistente
     fun deleteNote(note: TripNote) {
         viewModelScope.launch {
             repository.deleteNote(note)
         }
     }
 
-    // === OPERAZIONI SULLE FOTO ===
+    //=== operazioni sulle foto ===
 
-    /**
-     * Ottiene tutte le foto di un viaggio specifico.
-     *
-     * @param tripId ID del viaggio
-     * @return Flow che emette la lista aggiornata delle foto
-     */
+    //restituisce tutte le foto associate a un viaggio
     fun getPhotosForTrip(tripId: Int): Flow<List<TripPhoto>> {
         return repository.getPhotosForTrip(tripId)
     }
 
-    /**
-     * Ottiene le ultime 3 foto di un viaggio.
-     * Utile per mostrare un'anteprima durante il tracking.
-     *
-     * @param tripId ID del viaggio
-     * @return Flow con le ultime 3 foto
-     */
+    //restituisce le ultime 3 foto per anteprima
     fun getRecentPhotosForTrip(tripId: Int): Flow<List<TripPhoto>> {
         return repository.getRecentPhotosForTrip(tripId, limit = 3)
     }
 
-    /**
-     * Ottiene tutte le foto con coordinate GPS di un viaggio.
-     * Utile per visualizzarle su una mappa.
-     *
-     * @param tripId ID del viaggio
-     * @return Flow con le foto che hanno coordinate valide
-     */
+    //restituisce le foto che contengono coordinate gps per la mappa
     fun getPhotosWithLocation(tripId: Int): Flow<List<TripPhoto>> {
         return repository.getPhotosWithLocation(tripId)
     }
 
-    /**
-     * Inserisce una nuova foto nel database.
-     *
-     * @param photo Foto da inserire
-     */
+    //inserisce una nuova foto nel database
     fun insertPhoto(photo: TripPhoto) {
         viewModelScope.launch {
             try {
@@ -326,61 +248,28 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Aggiorna una foto esistente.
-     * Utile per modificare la didascalia.
-     *
-     * @param photo Foto con i dati aggiornati
-     */
+    //aggiorna i dati di una foto esistente (es. didascalia)
     fun updatePhoto(photo: TripPhoto) {
         viewModelScope.launch {
             repository.updatePhoto(photo)
         }
     }
 
-    /**
-     * Cancella una foto dal database.
-     * NOTA: Non elimina il file fisico, solo il record dal database.
-     *
-     * @param photo Foto da cancellare
-     */
+    //elimina una foto dal database (non cancella il file fisico)
     fun deletePhoto(photo: TripPhoto) {
         viewModelScope.launch {
             repository.deletePhoto(photo)
         }
     }
 
-    /**
-     * Ottiene il numero di foto per un viaggio.
-     *
-     * @param tripId ID del viaggio
-     * @return Numero di foto
-     */
+    //ottiene il numero di foto associate a un determinato viaggio
     suspend fun getPhotosCount(tripId: Int): Int {
         return repository.getPhotosCount(tripId)
     }
 
-    // === ⭐ GESTIONE STATO TEMPORALE DEI VIAGGI ===
+    //=== gestione stato temporale dei viaggi ===
 
-    /**
-     * Determina lo stato temporale di un viaggio rispetto alla data corrente.
-     *
-     * Questo metodo confronta le date pianificate del viaggio con la data odierna
-     * per stabilire se il viaggio è:
-     * - ACTIVE: in corso (oggi è tra startDate e endDate)
-     * - UPCOMING: inizia presto (entro 3 giorni)
-     * - RECENT: appena finito (terminato da massimo 3 giorni)
-     * - FUTURE: pianificato per il futuro lontano
-     * - PAST: terminato da tempo
-     *
-     * UTILITÀ:
-     * - In TripTrackingScreen per dare priorità ai viaggi rilevanti
-     * - In TripListScreen per raggruppare i viaggi per stato
-     * - Per validare se ha senso tracciare un determinato viaggio
-     *
-     * @param trip Viaggio da analizzare
-     * @return TripTemporalStatus che descrive la relazione temporale
-     */
+    //determina se un viaggio è in corso, futuro, recente o passato
     fun getTripTemporalStatus(trip: Trip): TripTemporalStatus {
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -405,40 +294,20 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
             set(Calendar.MILLISECOND, 999)
         }
 
-        // Calcola differenza in giorni
         val millisecondsInDay = 1000L * 60 * 60 * 24
         val daysUntilStart = ((startCal.timeInMillis - today.time) / millisecondsInDay).toInt()
         val daysSinceEnd = ((today.time - endCal.timeInMillis) / millisecondsInDay).toInt()
 
         return when {
-            // Viaggio in corso (oggi è tra start e end)
-            today >= trip.startDate && today <= endCal.time ->
-                TripTemporalStatus.ACTIVE
-
-            // Viaggio inizia tra 0-3 giorni
-            daysUntilStart in 0..3 ->
-                TripTemporalStatus.UPCOMING
-
-            // Viaggio finito da 0-3 giorni
-            daysSinceEnd in 0..3 ->
-                TripTemporalStatus.RECENT
-
-            // Viaggio nel passato
-            today > endCal.time ->
-                TripTemporalStatus.PAST
-
-            // Viaggio nel futuro lontano
-            else ->
-                TripTemporalStatus.FUTURE
+            today >= trip.startDate && today <= endCal.time -> TripTemporalStatus.ACTIVE
+            daysUntilStart in 0..3 -> TripTemporalStatus.UPCOMING
+            daysSinceEnd in 0..3 -> TripTemporalStatus.RECENT
+            today > endCal.time -> TripTemporalStatus.PAST
+            else -> TripTemporalStatus.FUTURE
         }
     }
 
-    /**
-     * Calcola quanti giorni mancano all'inizio del viaggio.
-     *
-     * @param trip Viaggio da analizzare
-     * @return Numero di giorni (positivo = futuro, negativo = passato, 0 = oggi)
-     */
+    //calcola i giorni che mancano all’inizio del viaggio
     fun getDaysUntilTripStart(trip: Trip): Int {
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -459,12 +328,7 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         return ((startCal.timeInMillis - today.timeInMillis) / millisecondsInDay).toInt()
     }
 
-    /**
-     * Calcola quanti giorni sono passati dalla fine del viaggio.
-     *
-     * @param trip Viaggio da analizzare
-     * @return Numero di giorni (positivo = passato, negativo = futuro, 0 = oggi)
-     */
+    //calcola i giorni trascorsi dalla fine del viaggio
     fun getDaysSinceTripEnd(trip: Trip): Int {
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -485,12 +349,8 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
         return ((today.timeInMillis - endCal.timeInMillis) / millisecondsInDay).toInt()
     }
 
-    // === VALIDAZIONE INPUT ===
-
-    /**
-     * Valida che tutti i campi obbligatori siano compilati.
-     * NOTA: La descrizione NON è obbligatoria, quindi non fa parte della validazione
-     */
+    //=== validazione input ===
+    //controlla che tutti i campi obbligatori del form siano compilati
     private fun validateInput(
         destination: String,
         startDate: String,
@@ -503,30 +363,25 @@ class TripViewModel(private val repository: TripRepository) : ViewModel() {
                 tripType.isNotBlank()
     }
 
-    // === FACTORY PER CREARE IL VIEWMODEL ===
-
+    //=== factory per creare il viewmodel ===
     companion object {
         fun Factory(repository: TripRepository): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                TripViewModel(repository)
+                TripViewModel(repository) //inizializza il viewmodel con il repository passato
             }
         }
     }
 }
 
-// === DATA CLASSES E ENUM PER LO STATO DELL'UI ===
+//=== data classes e enum per rappresentare lo stato dell’interfaccia ===
 
-/**
- * Stato generale dell'applicazione (lista viaggi).
- */
+//stato generale dell’app: contiene la lista viaggi e flag di caricamento
 data class TripUiState(
     val tripList: List<Trip> = emptyList(),
     val isLoading: Boolean = false
 )
 
-/**
- * Stato dei dettagli del viaggio in inserimento/modifica.
- */
+//stato dei dettagli di un viaggio in fase di inserimento o modifica
 data class TripDetailsUiState(
     val destination: String = "",
     val destinationLat: Double? = null,
@@ -538,27 +393,11 @@ data class TripDetailsUiState(
     val isEntryValid: Boolean = false
 )
 
-/**
- * ⭐ NUOVO: Enum per rappresentare lo stato temporale di un viaggio.
- *
- * Usato per:
- * - Prioritizzare i viaggi in TripTrackingScreen
- * - Colorare/raggruppare i viaggi in TripListScreen
- * - Mostrare badge di stato nell'UI
- */
+//enum che definisce lo stato temporale di un viaggio rispetto alla data corrente
 enum class TripTemporalStatus {
-    /** Viaggio in corso (oggi è tra le date pianificate) */
-    ACTIVE,
-
-    /** Viaggio che inizia presto (entro 3 giorni) */
-    UPCOMING,
-
-    /** Viaggio appena concluso (finito da massimo 3 giorni) */
-    RECENT,
-
-    /** Viaggio pianificato per il futuro lontano */
-    FUTURE,
-
-    /** Viaggio terminato da tempo */
-    PAST
+    ACTIVE, //viaggio in corso
+    UPCOMING, //viaggio imminente entro 3 giorni
+    RECENT, //viaggio concluso da massimo 3 giorni
+    FUTURE, //viaggio pianificato lontano
+    PAST //viaggio terminato da tempo
 }

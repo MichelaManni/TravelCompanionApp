@@ -21,49 +21,42 @@ class ReminderWorker(
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
-    /**
-     * Metodo principale eseguito dal Worker.
-     *
-     * Return:
-     * - Result.success() se il lavoro è completato con successo
-     * - Result.retry() se c'è stato un errore temporaneo
-     * - Result.failure() se c'è stato un errore permanente
-     */
+    //funzione principale che viene eseguita quando il worker parte
     override suspend fun doWork(): Result {
         return try {
-            // Ottiene il database
+            //ottiene un’istanza del database locale dell’app
             val database = AppDatabase.getDatabase(applicationContext)
-            val tripDao = database.tripDao()
+            val tripDao = database.tripDao() //accede al dao dei viaggi
 
-            // Ottiene tutti i viaggi dal database
-            // Nota: qui usiamo una query sincrona (non Flow)
-            // perché WorkManager è già in background
+            //recupera tutti i viaggi dal database
+            //usa una query sincrona perché il worker è già in un thread in background
             val allTrips = tripDao.getAllTripsSync()
 
-            // Se non ci sono viaggi, non fare nulla
+            //se non esistono viaggi salvati, termina senza fare nulla
             if (allTrips.isEmpty()) {
                 return Result.success()
             }
 
-            // Trova l'ultimo viaggio completato (per data di fine)
+            //seleziona l’ultimo viaggio completato in base alla data di fine
             val lastTrip = allTrips
-                .filter { it.isCompleted } // Solo viaggi completati
-                .maxByOrNull { it.endDate } // Prende quello con data fine più recente
+                .filter { it.isCompleted } //considera solo i viaggi contrassegnati come completati
+                .maxByOrNull { it.endDate } //prende il più recente per data di fine
 
-            // Se non ci sono viaggi completati, non fare nulla
+            //se non ci sono viaggi completati, termina senza notificare
             if (lastTrip == null) {
                 return Result.success()
             }
 
-            // Calcola quanti giorni sono passati dall'ultimo viaggio
+            //calcola i giorni trascorsi dalla fine dell’ultimo viaggio
             val currentTime = System.currentTimeMillis()
             val lastTripTime = lastTrip.endDate.time
             val daysSinceLastTrip = TimeUnit.MILLISECONDS.toDays(currentTime - lastTripTime)
 
-            // Se sono passati più di 3 giorni, invia la notifica
+            //se sono passati almeno 3 giorni, valuta l’invio della notifica
             if (daysSinceLastTrip >= 3) {
-                // Controlla che l'app abbia il permesso per le notifiche
+                //controlla se l’app ha il permesso di inviare notifiche
                 if (NotificationHelper.hasNotificationPermission(applicationContext)) {
+                    //invoca la funzione helper per mostrare una notifica di promemoria
                     NotificationHelper.sendTripReminderNotification(
                         context = applicationContext,
                         daysSinceLastTrip = daysSinceLastTrip.toInt()
@@ -71,22 +64,13 @@ class ReminderWorker(
                 }
             }
 
-            // Lavoro completato con successo
+            //ritorna risultato di successo: il lavoro è stato completato correttamente
             Result.success()
 
         } catch (e: Exception) {
-            // Se c'è un errore, prova a ripetere il lavoro
+            //in caso di eccezioni logga l’errore e chiede al workmanager di riprovare
             e.printStackTrace()
             Result.retry()
         }
     }
 }
-
-/**
- * NOTA: Questa funzione di estensione è necessaria perché TripDao
- * ha solo metodi Flow (reattivi), ma WorkManager ha bisogno di una
- * query sincrona. Aggiungi questo metodo a TripDao:
- *
- * @Query("SELECT * FROM trips ORDER BY startDate DESC")
- * suspend fun getAllTripsSync(): List<Trip>
- */
