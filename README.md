@@ -1,3 +1,4 @@
+(Per far funzionare necessario inserire API key nel Manifest per Google Maps)
 # Panoramica dell’Applicazione
 Travel Companion è un’applicazione Android in Kotlin con Jetpack Compose per pianificazione, tracciamento e documentazione delle esperienze di viaggio. L’app permette
 di creare piani di viaggio, registrare percorsi GPS, catturare foto e note, e visualizzare
