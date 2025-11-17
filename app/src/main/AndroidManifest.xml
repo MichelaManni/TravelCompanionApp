@@ -37,7 +37,7 @@
         <!-- API Key per Google Maps -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCcpWT4HN5fkscIu-exDA1I4nw7ymEqB3I" />
+            android:value="***************" />
 
         <!--  FILE PROVIDER PER CONDIVIDERE FILE FOTO -->
         <!-- Il FileProvider permette all'app di condividere file in modo sicuro
